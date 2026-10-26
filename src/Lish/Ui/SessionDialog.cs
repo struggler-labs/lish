@@ -12,7 +12,9 @@ namespace Lish.Ui
     {
         private readonly ProfileStore _store;
         private readonly HostProfile _original;
-        private readonly TableLayoutPanel _grid;
+        private readonly TableLayoutPanel _grid, _advGrid;
+        private readonly ExpanderHeader _advToggle;
+        private TableLayoutPanel _target;   // Section/Field/Hint 가 행을 넣을 그리드
 
         private readonly InputBox _name, _host, _port, _user, _password, _key, _proxy, _term, _keepAlive, _forwards, _socks, _note;
         private readonly ComboField _group, _jump, _encoding;
@@ -42,8 +44,29 @@ namespace Lish.Ui
             };
             _grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.Scale(128)));
             _grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+            // 고급 설정(터미널·포트 포워딩·메모)은 접어 두고 펼치기 버튼으로 연다
+            _advGrid = new TableLayoutPanel
+            {
+                ColumnCount = 2,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Dock = DockStyle.Top,
+                BackColor = Color.White,
+                Padding = new Padding(0, 0, Theme.Scale(8), 0),
+                Visible = false,
+            };
+            _advGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.Scale(128)));
+            _advGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            _advToggle = new ExpanderHeader("고급 설정", "터미널 · 포트 포워딩 · 메모") { Dock = DockStyle.Top };
+            _advToggle.Toggled += (s, e) => SetAdvanced(_advToggle.Expanded);
+
+            // Dock=Top 은 나중에 넣은 것이 위로 간다
+            scroller.Controls.Add(_advGrid);
+            scroller.Controls.Add(_advToggle);
             scroller.Controls.Add(_grid);
             Body.Controls.Add(scroller);
+            _target = _grid;
 
             var p = existing?.Clone() ?? new HostProfile { Group = defaultGroup };
 
@@ -78,6 +101,7 @@ namespace Lish.Ui
             Hint("배스천 서버를 경유합니다. 저장된 세션 이름 또는 user@host:port");
             _proxy = Field("프록시", new InputBox("http://proxy:8080 · socks5://host:1080"));
 
+            _target = _advGrid;
             Section("터미널");
             _encoding = Field("문자셋", new ComboField(true));
             _encoding.Combo.Items.AddRange(new object[] { "UTF-8", "CP949", "EUC-KR" });
@@ -107,6 +131,11 @@ namespace Lish.Ui
             _socks.Text = string.Join(", ", p.DynamicForwardList);
             _note.Text = p.Note ?? "";
 
+            // 기본값이 아닌 고급 설정이 있으면 처음부터 펼쳐서 보여 준다
+            _advToggle.Expanded = _advGrid.Visible =
+                !string.IsNullOrEmpty(p.Encoding) || !string.IsNullOrEmpty(p.Term) || p.KeepAlive != 30
+                || p.LocalForwardList.Count > 0 || p.DynamicForwardList.Count > 0 || !string.IsNullOrEmpty(p.Note);
+
             _error = new Label { Dock = DockStyle.Fill, ForeColor = Theme.Danger, TextAlign = ContentAlignment.MiddleLeft, AutoSize = false, Width = Theme.Scale(220), Height = Theme.Scale(32) };
 
             var connect = AddButton("저장 후 접속", ButtonKind.Primary, DialogResult.None);
@@ -123,7 +152,7 @@ namespace Lish.Ui
         // TableLayoutPanel 의 RowStyles 는 행 인덱스와 1:1 로 매칭되므로 모든 행(섹션·필드·힌트)이 반드시 RowStyle 을 하나씩 추가해야 함
         private void Section(string title)
         {
-            var first = _grid.RowCount == 0;
+            var first = _target.RowCount == 0;
             var l = new Label
             {
                 Text = title,
@@ -134,10 +163,10 @@ namespace Lish.Ui
                 TextAlign = ContentAlignment.BottomLeft,
                 Margin = new Padding(0, first ? 0 : Theme.Scale(12), 0, Theme.Scale(4)),
             };
-            _grid.Controls.Add(l, 0, _grid.RowCount);
-            _grid.SetColumnSpan(l, 2);
-            _grid.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.Scale(26) + l.Margin.Vertical));
-            _grid.RowCount++;
+            _target.Controls.Add(l, 0, _target.RowCount);
+            _target.SetColumnSpan(l, 2);
+            _target.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.Scale(26) + l.Margin.Vertical));
+            _target.RowCount++;
         }
 
         private T Field<T>(string label, T control) where T : Control
@@ -154,19 +183,19 @@ namespace Lish.Ui
             var h = control.Height; // 그리드에 넣으면 Dock=Fill 로 셀 크기에 맞춰지므로 미리 읽어 둠
             control.Dock = DockStyle.Fill;
             control.Margin = new Padding(0, Theme.Scale(3), 0, Theme.Scale(3));
-            _grid.Controls.Add(l, 0, _grid.RowCount);
-            _grid.Controls.Add(control, 1, _grid.RowCount);
-            _grid.RowStyles.Add(new RowStyle(SizeType.Absolute, h + Theme.Scale(6)));
-            _grid.RowCount++;
+            _target.Controls.Add(l, 0, _target.RowCount);
+            _target.Controls.Add(control, 1, _target.RowCount);
+            _target.RowStyles.Add(new RowStyle(SizeType.Absolute, h + Theme.Scale(6)));
+            _target.RowCount++;
             return control;
         }
 
         private void Hint(string text)
         {
             var l = new Label { Text = text, ForeColor = Theme.Faint, Font = Theme.Small, AutoSize = false, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, Theme.Scale(4)) };
-            _grid.Controls.Add(l, 1, _grid.RowCount);
-            _grid.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.Scale(18) + l.Margin.Vertical));
-            _grid.RowCount++;
+            _target.Controls.Add(l, 1, _target.RowCount);
+            _target.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.Scale(18) + l.Margin.Vertical));
+            _target.RowCount++;
         }
 
         private void BrowseKey()
@@ -183,9 +212,48 @@ namespace Lish.Ui
             }
         }
 
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            FitToContent();
+            if (Owner != null)   // 높이가 바뀌었으니 부모 창 기준으로 다시 가운데
+                Location = new Point(Owner.Left + (Owner.Width - Width) / 2, Math.Max(Screen.FromControl(Owner).WorkingArea.Top, Owner.Top + (Owner.Height - Height) / 2));
+        }
+
+        private void SetAdvanced(bool expanded)
+        {
+            _advToggle.Expanded = expanded;
+            if (_advGrid.Visible == expanded)
+                return;
+            _advGrid.Visible = expanded;
+            FitToContent();
+            if (expanded)
+            {
+                _encoding.Combo.Select(0, 0);   // 처음 보일 때 편집 콤보 글자가 선택돼 보이는 것 방지
+                ((ScrollableControl)_advGrid.Parent).ScrollControlIntoView(_advGrid);
+            }
+        }
+
+        /// <summary>내용(고급 설정 펼침 여부 포함)에 맞춰 창 높이를 바꾼다. 화면을 넘으면 스크롤.</summary>
+        private void FitToContent()
+        {
+            var content = _grid.GetPreferredSize(new Size(_grid.Width, 0)).Height + _advToggle.Height
+                          + (_advGrid.Visible ? _advGrid.GetPreferredSize(new Size(_grid.Width, 0)).Height : 0);
+            var chrome = ClientSize.Height - Body.Height;
+            var area = Screen.FromControl(this).WorkingArea;
+            var height = Math.Min(chrome + content + Theme.Scale(4), area.Height - (Height - ClientSize.Height) - Theme.Scale(40));
+            if (height == ClientSize.Height)
+                return;
+            ClientSize = new Size(ClientSize.Width, height);
+            if (Visible && Bottom > area.Bottom)
+                Top = Math.Max(area.Top, area.Bottom - Height);
+        }
+
         private void Fail(string message, Control focus)
         {
             _error.Text = message;
+            if (focus != null && _advGrid.Contains(focus))
+                SetAdvanced(true);
             focus?.Focus();
         }
 

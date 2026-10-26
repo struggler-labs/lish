@@ -10,7 +10,7 @@
     <AssemblyName>lish</AssemblyName>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <Version>0.0.2</Version>
+    <Version>0.0.3</Version>
     <Product>LISH - Lightweight SSH</Product>
     <Description>Lightweight SSH &amp; SFTP Client for Windows</Description>
     <Company>LISH</Company>
