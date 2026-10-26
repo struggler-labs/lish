@@ -30,4 +30,5 @@ jobs:
             dist/lish.exe
             dist/lish.exe.config
             dist/D2Coding-OFL.txt
+            dist/THIRD-PARTY-NOTICES.txt
           retention-days: 14

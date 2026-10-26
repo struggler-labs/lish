@@ -64,7 +64,7 @@ jobs:
         run: |
           $name = "lish-${{ steps.ver.outputs.tag }}-win"
           New-Item -ItemType Directory -Force "pkg/$name" | Out-Null
-          Copy-Item dist/lish.exe, dist/lish.exe.config, dist/D2Coding-OFL.txt, LICENSE, README.md, CHANGELOG.md "pkg/$name"
+          Copy-Item dist/lish.exe, dist/lish.exe.config, dist/D2Coding-OFL.txt, dist/THIRD-PARTY-NOTICES.txt, LICENSE, README.md, CHANGELOG.md "pkg/$name"
           Compress-Archive -Path "pkg/$name/*" -DestinationPath "pkg/$name.zip"
           Copy-Item dist/lish.exe pkg/lish.exe
           $sums = Get-ChildItem pkg -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name }

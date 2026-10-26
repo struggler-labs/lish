@@ -319,21 +319,21 @@ namespace Lish.Ui
 
         private ContextMenuStrip BuildMenu()
         {
-            var m = new ContextMenuStrip { Renderer = new FlatMenuRenderer(), Font = Theme.UiFont };
-            m.Items.Add("열기", null, (s, e) => OpenSelected());
-            m.Items.Add("다운로드...", null, (s, e) => DownloadSelected());
-            m.Items.Add("업로드...", null, (s, e) => UploadDialog());
-            m.Items.Add(new ToolStripSeparator());
-            m.Items.Add("이름 바꾸기", null, (s, e) => _list.SelectedItems.Cast<ListViewItem>().FirstOrDefault()?.BeginEdit());
-            m.Items.Add("새 폴더", null, (s, e) => NewFolder());
-            m.Items.Add("삭제", null, (s, e) => DeleteSelected());
-            m.Items.Add(new ToolStripSeparator());
-            m.Items.Add("경로 복사", null, (s, e) =>
+            var m = new FlatMenu();
+            m.Add("열기", Theme.IconOpen, OpenSelected, "Enter");
+            m.Add("다운로드...", Theme.IconDownload, DownloadSelected);
+            m.Add("업로드...", Theme.IconUpload, UploadDialog);
+            m.AddSeparator();
+            m.Add("이름 바꾸기", Theme.IconRename, () => _list.SelectedItems.Cast<ListViewItem>().FirstOrDefault()?.BeginEdit(), "F2");
+            m.Add("새 폴더", Theme.IconNewFolder, NewFolder);
+            m.AddDanger("삭제", Theme.IconDelete, DeleteSelected).ShortcutKeyDisplayString = "Del";
+            m.AddSeparator();
+            m.Add("경로 복사", Theme.IconLink, () =>
             {
                 var e1 = SelectedEntries().FirstOrDefault();
                 Clipboard.SetText(e1 != null ? e1.FullName : _path);
             });
-            m.Items.Add("새로 고침", null, (s, e) => Navigate(_path));
+            m.Add("새로 고침", Theme.IconRefresh, () => Navigate(_path), "F5");
             return m;
         }
 

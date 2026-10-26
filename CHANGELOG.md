@@ -8,6 +8,19 @@
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-10-26
+
+### Added
+- **정보 창**: 탭 바 오른쪽 설정 버튼 옆 ⓘ 버튼. 버전, 빌드 커밋 해시(복사 가능), 라이선스(GPL-3.0), 저장소 링크,
+  exe 에 내장된 오픈소스 라이브러리 목록(이름·버전·라이선스, 빌드 시 실제 내장 패키지에서 자동 생성), 오픈소스 고지 전문 보기.
+- `THIRD-PARTY-NOTICES.txt`: 내장 라이브러리(SSH.NET, BouncyCastle, .NET 라이브러리 — MIT)와 D2Coding(OFL-1.1) 고지. 릴리스 zip 에 포함, exe 에도 내장.
+
+### Changed
+- **우클릭 메뉴 새 디자인** (세션 트리·탭·SFTP 목록·터미널): 둥근 모서리(Windows 11), 항목 아이콘, 단축키 표시,
+  둥근 선택 배경, 삭제 항목은 빨간색, 여유 있는 항목 높이.
+- 세션 편집 창: **네트워크(점프 호스트·프록시)**도 고급 설정으로 이동. 기본 화면은 연결·인증만 표시.
+- README 스크린샷 갱신.
+
 ## [0.0.3] - 2026-10-26
 
 ### Changed
@@ -38,6 +51,7 @@ Windows 10/11용 WinForms GUI 클라이언트 첫 공개 버전입니다.
 - SSH.NET 2026.0.0 사용 (2025.0.0 의 GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284 회피).
 - 호스트 키 확인 창의 Enter 기본값은 '취소' — 키 신뢰는 버튼을 직접 눌러야 합니다.
 
-[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/struggler-labs/lish/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/struggler-labs/lish/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/struggler-labs/lish/releases/tag/v0.0.2

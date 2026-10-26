@@ -62,6 +62,17 @@ namespace Lish.Ui
         public const string IconLock = "";
         public const string IconKey = "";
         public const string IconHome = "";
+        public const string IconInfo = "\uE946";
+        public const string IconPaste = "\uE77F";
+        public const string IconSelectAll = "\uE8B3";
+        public const string IconClear = "\uE894";
+        public const string IconRename = "\uE8AC";
+        public const string IconSave = "\uE74E";
+        public const string IconLink = "\uE71B";
+        public const string IconOpen = "\uE8E5";
+        public const string IconMoveTo = "\uE8DE";
+        public const string IconPlay = "\uE768";
+        public const string IconNewWindow = "\uE8A7";
 
         private static string PickUiFont()
         {
@@ -272,42 +283,6 @@ namespace Lish.Ui
                     w += g.MeasureString(ch.ToString(), f, PointF.Empty, StringFormat.GenericTypographic).Width + size * 0.06f;
                 return new SizeF(w, size * 1.2f);
             }
-        }
-    }
-
-    /// <summary>ContextMenuStrip/ToolStrip 용 플랫 렌더러.</summary>
-    internal sealed class FlatMenuRenderer : ToolStripProfessionalRenderer
-    {
-        public FlatMenuRenderer() : base(new FlatColors()) { RoundedEdges = false; }
-
-        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
-        {
-            if (!e.Item.Selected || !e.Item.Enabled)
-                return;
-            var r = new Rectangle(4, 1, e.Item.Width - 8, e.Item.Height - 2);
-            Theme.Smooth(e.Graphics);
-            using (var p = Theme.RoundRect(r, 4))
-            using (var b = new SolidBrush(Theme.PrimarySoft))
-                e.Graphics.FillPath(b, p);
-        }
-
-        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-        {
-            e.TextColor = e.Item.Enabled ? Theme.Ink : Theme.Faint;
-            base.OnRenderItemText(e);
-        }
-
-        private sealed class FlatColors : ProfessionalColorTable
-        {
-            public override Color MenuBorder => Theme.Border;
-            public override Color ToolStripDropDownBackground => Color.White;
-            public override Color ImageMarginGradientBegin => Color.White;
-            public override Color ImageMarginGradientMiddle => Color.White;
-            public override Color ImageMarginGradientEnd => Color.White;
-            public override Color SeparatorDark => Theme.Border;
-            public override Color SeparatorLight => Color.White;
-            public override Color MenuItemSelected => Theme.PrimarySoft;
-            public override Color MenuItemBorder => Theme.PrimarySoft;
         }
     }
 }
