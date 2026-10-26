@@ -8,6 +8,15 @@
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-10-26
+
+### Changed
+- 세션 편집 창: **터미널 · 포트 포워딩 · 메모**를 "고급 설정"으로 접어 두고, 오른쪽 "펼치기/접기" 버튼으로 엽니다.
+  창 높이가 내용에 맞춰 늘고 줄며, 기본값이 아닌 고급 설정이 있는 세션을 편집하거나 고급 설정 칸에 입력 오류가 있으면 자동으로 펼칩니다.
+
+### Docs
+- README 에 첫 화면 스크린샷 추가.
+
 ## [0.0.2] - 2026-10-26
 
 Windows 10/11용 WinForms GUI 클라이언트 첫 공개 버전입니다.
@@ -29,5 +38,6 @@ Windows 10/11용 WinForms GUI 클라이언트 첫 공개 버전입니다.
 - SSH.NET 2026.0.0 사용 (2025.0.0 의 GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284 회피).
 - 호스트 키 확인 창의 Enter 기본값은 '취소' — 키 신뢰는 버튼을 직접 눌러야 합니다.
 
-[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/struggler-labs/lish/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/struggler-labs/lish/releases/tag/v0.0.2

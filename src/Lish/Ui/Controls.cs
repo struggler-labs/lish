@@ -404,6 +404,101 @@ namespace Lish.Ui
         }
     }
 
+    /// <summary>접고 펼치는 구역의 머리줄: 구분선 + 제목·요약 + 오른쪽 "펼치기/접기" 버튼. 줄 어디를 눌러도 토글.</summary>
+    internal sealed class ExpanderHeader : Control
+    {
+        private readonly string _summary;
+        private bool _expanded, _hover;
+
+        public event EventHandler Toggled;
+
+        public bool Expanded
+        {
+            get => _expanded;
+            set
+            {
+                if (_expanded == value) return;
+                _expanded = value;
+                Invalidate();
+            }
+        }
+
+        public ExpanderHeader(string title, string summary)
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer
+                     | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+            BackColor = Color.White;
+            Text = title;
+            _summary = summary;
+            Cursor = Cursors.Hand;
+            Height = Theme.Scale(58);
+            TabStop = true;
+        }
+
+        private void Toggle()
+        {
+            Expanded = !Expanded;
+            Toggled?.Invoke(this, EventArgs.Empty);
+        }
+
+        protected override void OnClick(EventArgs e)
+        {
+            base.OnClick(e);
+            Focus();
+            Toggle();
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (e.KeyCode == Keys.Space)
+                Toggle();
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); _hover = true; Invalidate(); }
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _hover = false; Invalidate(); }
+        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(BackColor);
+            Theme.Smooth(g);
+            var right = Width - Theme.Scale(8);   // 위 그리드의 오른쪽 여백과 맞춤
+            var lineY = Theme.Scale(14);
+            using (var pen = new Pen(Theme.Border))
+                g.DrawLine(pen, 0, lineY, right, lineY);
+
+            var rowTop = lineY + Theme.Scale(6);
+            var rowH = Height - rowTop - Theme.Scale(4);
+
+            // 오른쪽 버튼
+            var label = Expanded ? "접기" : "펼치기";
+            var textW = TextRenderer.MeasureText(label, Theme.UiFont).Width;
+            var pill = new RectangleF(right - textW - Theme.Scale(40), rowTop + (rowH - Theme.Scale(28)) / 2f, textW + Theme.Scale(40), Theme.Scale(28));
+            using (var path = Theme.RoundRect(pill, Theme.Scale(14)))
+            {
+                using (var b = new SolidBrush(_hover || Focused ? Theme.PrimarySoft : Theme.PrimarySofter))
+                    g.FillPath(b, path);
+                if (Focused)
+                    using (var pen = new Pen(Theme.Accent)) g.DrawPath(pen, path);
+            }
+            Theme.DrawIcon(g, Expanded ? Theme.IconChevronDown : Theme.IconChevronRight, Theme.IconsSmall, Theme.Primary,
+                new Rectangle((int)pill.X + Theme.Scale(10), (int)pill.Y, Theme.Scale(14), (int)pill.Height));
+            TextRenderer.DrawText(g, label, Theme.UiFont, new Rectangle((int)pill.X + Theme.Scale(28), (int)pill.Y, textW + Theme.Scale(4), (int)pill.Height),
+                Theme.Primary, TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+
+            // 제목 + 요약
+            var titleW = TextRenderer.MeasureText(Text, Theme.Heading).Width;
+            var textRect = new Rectangle(0, rowTop, (int)pill.X - Theme.Scale(8), rowH);
+            TextRenderer.DrawText(g, Text, Theme.Heading, textRect, Theme.Deep,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+            TextRenderer.DrawText(g, _summary, Theme.Small, new Rectangle(titleW + Theme.Scale(6), rowTop, textRect.Width - titleW - Theme.Scale(6), rowH), Theme.Faint,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        }
+    }
+
     /// <summary>얇은 진행 막대 (0~100). 기본 ProgressBar 대신 테마 색으로 그린다.</summary>
     internal sealed class ThinProgress : Control
     {
