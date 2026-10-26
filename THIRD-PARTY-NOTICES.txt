@@ -1,0 +1,58 @@
+LISH - Third-Party Notices
+==========================
+
+LISH (https://github.com/struggler-labs/lish) is licensed under the GNU General Public License v3.0.
+lish.exe embeds the following third-party components. Their licenses and copyright notices are reproduced below.
+
+Component                                              Version    License        Copyright
+-----------------------------------------------------  ---------  -------------  ---------------------------------------------------------
+SSH.NET                                                2026.0.0   MIT            Copyright (c) Renci 2010-2026
+BouncyCastle.Cryptography                              2.7.0      MIT            Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc.
+Microsoft.Bcl.AsyncInterfaces                          8.0.0      MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+Microsoft.Bcl.Cryptography                             10.0.10    MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+Microsoft.Extensions.DependencyInjection.Abstractions  8.0.2      MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+Microsoft.Extensions.Logging.Abstractions              8.0.3      MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+System.Buffers                                         4.6.1      MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+System.Formats.Asn1                                    10.0.10    MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+System.Memory                                          4.6.3      MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+System.Numerics.Vectors                                4.6.1      MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+System.Runtime.CompilerServices.Unsafe                 6.1.2      MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+System.Threading.Tasks.Extensions                      4.5.4      MIT            Copyright (c) .NET Foundation and Contributors / Microsoft Corporation
+D2Coding (font)                                        1.3.2      OFL-1.1        Copyright (c) 2015, NAVER Corporation
+
+Project pages
+- SSH.NET: https://github.com/sshnet/SSH.NET
+- BouncyCastle.Cryptography: https://www.bouncycastle.org/
+- .NET libraries (Microsoft.*, System.*): https://github.com/dotnet/runtime, https://github.com/dotnet/maintenance-packages
+- D2Coding: https://github.com/naver/d2codingfont
+
+
+MIT License (SSH.NET, BouncyCastle.Cryptography, Microsoft.*, System.* above)
+------------------------------------------------------------------------------
+
+Copyright notices: see the table above.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+SIL Open Font License 1.1 (D2Coding)
+------------------------------------
+
+The full license text is in src/Lish/assets/fonts/OFL.txt and is distributed
+with release builds as D2Coding-OFL.txt. It is also shown in LISH > 정보 > 오픈소스 고지.

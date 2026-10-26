@@ -29,4 +29,6 @@ Copy-Item "$out\lish.exe" $dist -Force
 Copy-Item "$out\lish.exe.config" $dist -Force
 # 내장 글꼴 라이선스(SIL OFL 1.1)는 배포물에 함께 넣어야 한다.
 Copy-Item "$root\src\Lish\assets\fonts\OFL.txt" "$dist\D2Coding-OFL.txt" -Force
+# 내장 라이브러리(MIT 등) 고지문 — exe 정보 창에도 내장돼 있다.
+Copy-Item "$root\THIRD-PARTY-NOTICES.txt" $dist -Force
 Write-Host "완료: $dist\lish.exe" -ForegroundColor Green

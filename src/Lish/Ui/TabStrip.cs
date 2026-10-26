@@ -13,8 +13,8 @@ namespace Lish.Ui
         private int _hover = -1;
         private bool _hoverClose;
         private Rectangle _addRect;
-        private Rectangle _settingsRect;
-        private bool _hoverAdd, _hoverSettings;
+        private Rectangle _settingsRect, _infoRect;
+        private bool _hoverAdd, _hoverSettings, _hoverInfo;
         private readonly ToolTip _tip = new ToolTip();
 
         public SessionView Selected { get; private set; }
@@ -23,6 +23,7 @@ namespace Lish.Ui
         public event Action<SessionView> CloseRequested;
         public event EventHandler AddRequested;
         public event EventHandler SettingsRequested;
+        public event EventHandler InfoRequested;
         public event Action<SessionView, Point> ContextRequested;
 
         public IReadOnlyList<SessionView> Tabs => _tabs;
@@ -74,7 +75,7 @@ namespace Lish.Ui
             var x = Theme.Scale(8);
             var top = Theme.Scale(6);
             var h = Height - top;
-            var right = Width - Theme.Scale(56);
+            var right = Width - Theme.Scale(92);
             var maxW = Theme.Scale(220);
             var minW = Theme.Scale(110);
             var avail = Math.Max(minW, (right - x - Theme.Scale(36)) / Math.Max(1, _tabs.Count) - Theme.Scale(4));
@@ -86,8 +87,9 @@ namespace Lish.Ui
                 x += w + Theme.Scale(4);
             }
             _addRect = new Rectangle(x + Theme.Scale(2), top + Theme.Scale(4), Theme.Scale(28), h - Theme.Scale(8));
-            // 오른쪽 끝: [설정] (SFTP 는 사이드바 SFTP 탭)
+            // 오른쪽 끝: [정보] [설정] (SFTP 는 사이드바 SFTP 탭)
             _settingsRect = new Rectangle(Width - Theme.Scale(40), Theme.Scale(6), Theme.Scale(32), Height - Theme.Scale(12));
+            _infoRect = new Rectangle(_settingsRect.X - Theme.Scale(36), _settingsRect.Y, _settingsRect.Width, _settingsRect.Height);
         }
 
         private Rectangle CloseRect(Rectangle tab) =>
@@ -169,6 +171,13 @@ namespace Lish.Ui
                 using (var b = new SolidBrush(Theme.PrimarySoft))
                     g.FillPath(b, path);
             Theme.DrawIcon(g, Theme.IconSettings, Theme.Icons, _hoverSettings ? Theme.Deep : Theme.SubText, _settingsRect);
+
+            // 정보
+            if (_hoverInfo)
+                using (var path = Theme.RoundRect(_infoRect, Theme.Scale(6)))
+                using (var b = new SolidBrush(Theme.PrimarySoft))
+                    g.FillPath(b, path);
+            Theme.DrawIcon(g, Theme.IconInfo, Theme.Icons, _hoverInfo ? Theme.Deep : Theme.SubText, _infoRect);
         }
 
         private int HitTab(Point p)
@@ -186,18 +195,21 @@ namespace Lish.Ui
             var hoverClose = hover >= 0 && CloseRect(_tabRects[hover]).Contains(e.Location);
             var hoverAdd = _addRect.Contains(e.Location);
             var hoverSettings = _settingsRect.Contains(e.Location);
-            if (hover != _hover || hoverClose != _hoverClose || hoverAdd != _hoverAdd || hoverSettings != _hoverSettings)
+            var hoverInfo = _infoRect.Contains(e.Location);
+            if (hover != _hover || hoverClose != _hoverClose || hoverAdd != _hoverAdd || hoverSettings != _hoverSettings || hoverInfo != _hoverInfo)
             {
-                if (hover != _hover || hoverAdd != _hoverAdd || hoverSettings != _hoverSettings)
+                if (hover != _hover || hoverAdd != _hoverAdd || hoverSettings != _hoverSettings || hoverInfo != _hoverInfo)
                     _tip.SetToolTip(this, hover >= 0 ? _tabs[hover].Profile.Display() + (string.IsNullOrEmpty(_tabs[hover].RemoteTitle) ? "" : "\n" + _tabs[hover].RemoteTitle)
                         : hoverAdd ? "빠른 접속 (Ctrl+Shift+L)"
                         : hoverSettings ? "설정"
+                        : hoverInfo ? "LISH 정보"
                         : null);
                 _hover = hover;
                 _hoverClose = hoverClose;
                 _hoverAdd = hoverAdd;
                 _hoverSettings = hoverSettings;
-                Cursor = hover >= 0 || hoverAdd || hoverSettings ? Cursors.Hand : Cursors.Default;
+                _hoverInfo = hoverInfo;
+                Cursor = hover >= 0 || hoverAdd || hoverSettings || hoverInfo ? Cursors.Hand : Cursors.Default;
                 Invalidate();
             }
         }
@@ -206,7 +218,7 @@ namespace Lish.Ui
         {
             base.OnMouseLeave(e);
             _hover = -1;
-            _hoverClose = _hoverAdd = _hoverSettings = false;
+            _hoverClose = _hoverAdd = _hoverSettings = _hoverInfo = false;
             Invalidate();
         }
 
@@ -241,6 +253,10 @@ namespace Lish.Ui
             else if (_settingsRect.Contains(e.Location))
             {
                 SettingsRequested?.Invoke(this, EventArgs.Empty);
+            }
+            else if (_infoRect.Contains(e.Location))
+            {
+                InfoRequested?.Invoke(this, EventArgs.Empty);
             }
         }
 

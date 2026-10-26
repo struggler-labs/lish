@@ -719,15 +719,13 @@ namespace Lish.Terminal
 
         private ContextMenuStrip BuildContextMenu()
         {
-            // 다른 메뉴(MainForm/SftpPanel)와 같은 플랫 렌더러·글꼴
-            var menu = new ContextMenuStrip { Renderer = new FlatMenuRenderer(), Font = Theme.UiFont };
-            var copy = new ToolStripMenuItem("복사", null, (s, e) => Copy()) { ShortcutKeyDisplayString = "Ctrl+Shift+C" };
-            var paste = new ToolStripMenuItem("붙여넣기", null, (s, e) => Paste()) { ShortcutKeyDisplayString = "Ctrl+Shift+V" };
-            menu.Items.Add(copy);
-            menu.Items.Add(paste);
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("모두 선택", null, (s, e) => SelectAll());
-            menu.Items.Add("스크롤백 지우기", null, (s, e) => { _term.ClearScrollback(); ScrollTo(0); });
+            // 다른 메뉴(MainForm/SftpPanel)와 같은 LISH 메뉴
+            var menu = new FlatMenu();
+            var copy = menu.Add("복사", Theme.IconCopy, Copy, "Ctrl+Shift+C");
+            var paste = menu.Add("붙여넣기", Theme.IconPaste, Paste, "Ctrl+Shift+V");
+            menu.AddSeparator();
+            menu.Add("모두 선택", Theme.IconSelectAll, SelectAll);
+            menu.Add("스크롤백 지우기", Theme.IconClear, () => { _term.ClearScrollback(); ScrollTo(0); });
             menu.Opening += (s, e) =>
             {
                 copy.Enabled = _hasSel;

@@ -39,14 +39,15 @@ Windows 10/11용 경량 SSH·SFTP GUI 클라이언트입니다 (C# WinForms, .NE
 | 복사/붙여넣기 | 드래그 선택 시 자동 복사(옵션), 오른쪽 클릭 붙여넣기(PuTTY 방식, 옵션), 여러 줄 붙여넣기 확인(옵션) |
 | Keepalive | 기본 30초 — 사내 방화벽의 유휴 세션 끊김 방지 (세션별 설정, 0 = 끔) |
 | 설정 | 탭 바 오른쪽 끝 톱니바퀴 — 글꼴, 글꼴 크기, 스크롤백 줄 수 등 |
+| 정보 | 톱니바퀴 옆 ⓘ — 버전, 빌드 커밋 해시, 라이선스, 내장 오픈소스 라이브러리 목록과 고지 |
 | 내장 글꼴 | D2Coding(일반·굵게)을 exe에 내장 — PC에 설치되어 있지 않아도 기본 터미널 글꼴로 사용 |
 
 ### 세션 편집 항목
 
 - **연결**: 세션 이름, 폴더(목록에서 만든 폴더 중 선택), 호스트(`user@host:port` 형식도 가능), 포트, 사용자
 - **인증**: 비밀번호(+ 저장 여부), 개인키 파일
-- **네트워크**: 점프 호스트, 프록시
 - **고급 설정** (기본 접힘, "펼치기" 버튼으로 열기 — 기본값이 아닌 값이 있으면 자동으로 펼침)
+  - **네트워크**: 점프 호스트, 프록시
   - **터미널**: 문자셋, 터미널 타입(기본 `xterm-256color`), Keepalive(초)
   - **포트 포워딩**: 로컬 `-L` (한 줄에 하나), SOCKS `-D` (콤마로 여러 개)
   - **메모**: 설명
@@ -113,10 +114,16 @@ Windows 10/11용 경량 SSH·SFTP GUI 클라이언트입니다 (C# WinForms, .NE
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
-- 결과물: `dist\lish.exe` (+ `lish.exe.config`, `D2Coding-OFL.txt`)
+- 결과물: `dist\lish.exe` (+ `lish.exe.config`, `D2Coding-OFL.txt`, `THIRD-PARTY-NOTICES.txt`)
 - `src\Lish\assets\lish.ico`가 없으면 빌드된 `lish.exe --make-icon`으로 앱 아이콘을 생성한 뒤 다시 빌드합니다.
 - 의존 DLL과 D2Coding 글꼴(gzip 압축)은 빌드 시 exe 리소스로 내장되므로 `lish.exe` 하나로 배포됩니다.
 - D2Coding 은 NAVER의 SIL Open Font License 1.1 글꼴입니다. 재배포 시 `D2Coding-OFL.txt`(원본: `src\Lish\assets\fonts\OFL.txt`)를 함께 넣으세요.
+
+## 오픈소스 라이선스
+
+LISH 는 GPL-3.0 으로 배포됩니다. exe 에 내장된 라이브러리(SSH.NET, BouncyCastle.Cryptography, .NET 런타임 보조 라이브러리 — 모두 MIT)와
+D2Coding 글꼴(OFL-1.1)의 고지는 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) 에 있고, 앱의 **정보(ⓘ) → 오픈소스 고지 전체 보기**에서도 볼 수 있습니다.
+정보 창의 라이브러리 목록은 빌드할 때 실제로 내장되는 NuGet 패키지에서 자동으로 만들어집니다. 의존성을 바꾸면 `THIRD-PARTY-NOTICES.txt` 도 함께 갱신하세요.
 
 ## 다운로드 · 릴리스
 

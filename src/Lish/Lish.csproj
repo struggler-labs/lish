@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -10,7 +10,7 @@
     <AssemblyName>lish</AssemblyName>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <Version>0.0.3</Version>
+    <Version>0.0.4</Version>
     <Product>LISH - Lightweight SSH</Product>
     <Description>Lightweight SSH &amp; SFTP Client for Windows</Description>
     <Company>LISH</Company>
@@ -43,6 +43,12 @@
     <EmbeddedResource Include="assets\fonts\D2Coding-Bold.ttf.gz" LogicalName="font.D2Coding.Bold.ttf.gz" />
   </ItemGroup>
 
+  <!-- 정보 창 "오픈소스 고지": exe 하나만 배포해도 라이선스 고지가 함께 가도록 내장 -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\THIRD-PARTY-NOTICES.txt" LogicalName="notices.THIRD-PARTY-NOTICES.txt" />
+    <EmbeddedResource Include="assets\fonts\OFL.txt" LogicalName="notices.D2Coding-OFL.txt" />
+  </ItemGroup>
+
   <!--
     의존 DLL을 exe 리소스로 내장 → lish.exe 하나만 복사해도 실행 (사내망 배포용).
     런타임에 Program.ResolveEmbedded 가 로드한다.
@@ -52,6 +58,17 @@
       <EmbeddedResource Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'">
         <LogicalName>lib.%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)</LogicalName>
       </EmbeddedResource>
+      <!-- 정보 창의 오픈소스 목록: 실제로 내장되는 NuGet 패키지 "Id|버전" -->
+      <_LishThirdParty Include="%(ReferenceCopyLocalPaths.NuGetPackageId)|%(ReferenceCopyLocalPaths.NuGetPackageVersion)"
+                       Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll' and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''" />
+    </ItemGroup>
+    <RemoveDuplicates Inputs="@(_LishThirdParty)">
+      <Output TaskParameter="Filtered" ItemName="_LishThirdPartyUnique" />
+    </RemoveDuplicates>
+    <WriteLinesToFile File="$(IntermediateOutputPath)thirdparty.txt" Lines="@(_LishThirdPartyUnique)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(IntermediateOutputPath)thirdparty.txt" LogicalName="thirdparty.txt" />
+      <FileWrites Include="$(IntermediateOutputPath)thirdparty.txt" />
     </ItemGroup>
   </Target>
 

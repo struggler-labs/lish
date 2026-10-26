@@ -58,7 +58,7 @@ namespace Lish.Ui
             };
             _advGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.Scale(128)));
             _advGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            _advToggle = new ExpanderHeader("고급 설정", "터미널 · 포트 포워딩 · 메모") { Dock = DockStyle.Top };
+            _advToggle = new ExpanderHeader("고급 설정", "네트워크 · 터미널 · 포트 포워딩 · 메모") { Dock = DockStyle.Top };
             _advToggle.Toggled += (s, e) => SetAdvanced(_advToggle.Expanded);
 
             // Dock=Top 은 나중에 넣은 것이 위로 간다
@@ -94,6 +94,7 @@ namespace Lish.Ui
             keyRow.Controls.Add(browse);
             Field("개인키", keyRow);
 
+            _target = _advGrid;
             Section("네트워크");
             _jump = Field("점프 호스트", new ComboField(true));
             _jump.Combo.Items.Add("");
@@ -101,7 +102,6 @@ namespace Lish.Ui
             Hint("배스천 서버를 경유합니다. 저장된 세션 이름 또는 user@host:port");
             _proxy = Field("프록시", new InputBox("http://proxy:8080 · socks5://host:1080"));
 
-            _target = _advGrid;
             Section("터미널");
             _encoding = Field("문자셋", new ComboField(true));
             _encoding.Combo.Items.AddRange(new object[] { "UTF-8", "CP949", "EUC-KR" });
@@ -133,7 +133,8 @@ namespace Lish.Ui
 
             // 기본값이 아닌 고급 설정이 있으면 처음부터 펼쳐서 보여 준다
             _advToggle.Expanded = _advGrid.Visible =
-                !string.IsNullOrEmpty(p.Encoding) || !string.IsNullOrEmpty(p.Term) || p.KeepAlive != 30
+                !string.IsNullOrEmpty(p.Jump) || !string.IsNullOrEmpty(p.Proxy)
+                || !string.IsNullOrEmpty(p.Encoding) || !string.IsNullOrEmpty(p.Term) || p.KeepAlive != 30
                 || p.LocalForwardList.Count > 0 || p.DynamicForwardList.Count > 0 || !string.IsNullOrEmpty(p.Note);
 
             _error = new Label { Dock = DockStyle.Fill, ForeColor = Theme.Danger, TextAlign = ContentAlignment.MiddleLeft, AutoSize = false, Width = Theme.Scale(220), Height = Theme.Scale(32) };

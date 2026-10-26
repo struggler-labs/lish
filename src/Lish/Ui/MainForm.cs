@@ -110,6 +110,7 @@ namespace Lish.Ui
             _tabs.CloseRequested += CloseTab;
             _tabs.AddRequested += (s, e) => QuickConnect();
             _tabs.SettingsRequested += (s, e) => ShowSettings();
+            _tabs.InfoRequested += (s, e) => { using (var d = new AboutDialog()) d.ShowDialog(this); };
             _tabs.ContextRequested += ShowTabMenu;
 
             _content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.TerminalBg };
@@ -589,38 +590,38 @@ namespace Lish.Ui
 
         private void ShowTreeMenu(TreeNode node, Point location)
         {
-            var m = new ContextMenuStrip { Renderer = new FlatMenuRenderer(), Font = Theme.UiFont };
+            var m = new FlatMenu();
             if (node?.Tag is HostProfile p)
             {
                 _tree.SelectedNode = node;
-                m.Items.Add("접속", null, (s, e) => Open(p.Clone())).Font = Theme.UiBold;
-                m.Items.Add("편집...", null, (s, e) => EditSession(p));
-                m.Items.Add("복제", null, (s, e) => DuplicateSession(p));
-                m.Items.Add("주소 복사", null, (s, e) => Clipboard.SetText(p.Target));
-                m.Items.Add(new ToolStripSeparator());
-                m.Items.Add("삭제", null, (s, e) => DeleteSession(p));
+                m.Add("접속", Theme.IconConnect, () => Open(p.Clone()), "Enter").Font = Theme.UiBold;
+                m.Add("편집...", Theme.IconEdit, () => EditSession(p), "F2");
+                m.Add("복제", Theme.IconCopy, () => DuplicateSession(p));
+                m.Add("주소 복사", Theme.IconLink, () => Clipboard.SetText(p.Target));
+                m.AddSeparator();
+                m.AddDanger("삭제", Theme.IconDelete, () => DeleteSession(p)).ShortcutKeyDisplayString = "Del";
             }
             else if (node?.Tag is string folder)
             {
                 _tree.SelectedNode = node;
-                m.Items.Add("새 세션...", null, (s, e) => NewSession(folder));
-                m.Items.Add("새 하위 폴더...", null, (s, e) => NewFolder(folder));
+                m.Add("새 세션...", Theme.IconAdd, () => NewSession(folder));
+                m.Add("새 하위 폴더...", Theme.IconNewFolder, () => NewFolder(folder));
                 var all = _store.SessionsUnder(folder).ToList();
-                m.Items.Add($"폴더 전체 접속 ({all.Count})", null, (s, e) =>
+                m.Add($"폴더 전체 접속 ({all.Count})", Theme.IconPlay, () =>
                 {
                     foreach (var gp in all)
                         Open(gp.Clone());
                 }).Enabled = all.Count > 0;
-                m.Items.Add(new ToolStripSeparator());
-                m.Items.Add("이름 바꾸기...", null, (s, e) => RenameFolder(folder));
+                m.AddSeparator();
+                m.Add("이름 바꾸기...", Theme.IconRename, () => RenameFolder(folder), "F2");
                 if (FolderPath.ParentOf(folder) != null)
-                    m.Items.Add("최상위로 이동", null, (s, e) => MoveInTree(folder, null));
-                m.Items.Add("폴더 삭제", null, (s, e) => DeleteFolder(folder));
+                    m.Add("최상위로 이동", Theme.IconMoveTo, () => MoveInTree(folder, null));
+                m.AddDanger("폴더 삭제", Theme.IconDelete, () => DeleteFolder(folder)).ShortcutKeyDisplayString = "Del";
             }
             else
             {
-                m.Items.Add("새 세션...", null, (s, e) => NewSession(null));
-                m.Items.Add("새 폴더...", null, (s, e) => NewFolder(null));
+                m.Add("새 세션...", Theme.IconAdd, () => NewSession(null), "Ctrl+Shift+N");
+                m.Add("새 폴더...", Theme.IconNewFolder, () => NewFolder(null));
             }
             m.Closed += (s, e) => BeginInvoke((Action)m.Dispose);
             m.Show(_tree, location);
@@ -717,12 +718,12 @@ namespace Lish.Ui
 
         private void ShowTabMenu(SessionView view, Point location)
         {
-            var m = new ContextMenuStrip { Renderer = new FlatMenuRenderer(), Font = Theme.UiFont };
-            m.Items.Add("다시 접속", null, (s, e) => view.Connect()).Enabled = view.State == SessionState.Disconnected;
-            m.Items.Add("탭 복제", null, (s, e) => Open(view.Profile.Clone()));
-            m.Items.Add("SFTP 열기 (사이드바)", null, (s, e) => SetSidebarPage(true)).Enabled = !_sidebarSftp;
+            var m = new FlatMenu();
+            m.Add("다시 접속", Theme.IconRefresh, () => view.Connect()).Enabled = view.State == SessionState.Disconnected;
+            m.Add("탭 복제", Theme.IconNewWindow, () => Open(view.Profile.Clone()), "Ctrl+Shift+T");
+            m.Add("SFTP 열기 (사이드바)", Theme.IconFolder, () => SetSidebarPage(true), "Ctrl+Shift+F").Enabled = !_sidebarSftp;
             if (string.IsNullOrEmpty(view.Profile.Name) || _store.Find(view.Profile.Name) == null)
-                m.Items.Add("세션으로 저장...", null, (s, e) =>
+                m.Add("세션으로 저장...", Theme.IconSave, () =>
                 {
                     using (var d = new SessionDialog(_store, null))
                     {
@@ -730,9 +731,9 @@ namespace Lish.Ui
                             RefreshTree();
                     }
                 });
-            m.Items.Add(new ToolStripSeparator());
-            m.Items.Add("닫기", null, (s, e) => CloseTab(view));
-            m.Items.Add("다른 탭 모두 닫기", null, (s, e) =>
+            m.AddSeparator();
+            m.Add("닫기", Theme.IconClose, () => CloseTab(view), "Ctrl+Shift+W");
+            m.Add("다른 탭 모두 닫기", null, () =>
             {
                 foreach (var t in _tabs.Tabs.Where(t => t != view).ToList())
                     CloseTab(t);

@@ -13,6 +13,29 @@ namespace Lish
 
         public static string Version => typeof(Program).Assembly.GetName().Version.ToString(3);
 
+        /// <summary>빌드한 git 커밋 해시 (SDK 가 InformationalVersion 의 "+해시" 로 넣는다). 없으면 null.</summary>
+        public static string BuildHash
+        {
+            get
+            {
+                var info = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+                var plus = info?.IndexOf('+') ?? -1;
+                return plus < 0 ? null : info.Substring(plus + 1);
+            }
+        }
+
+        /// <summary>exe 에 내장된 텍스트 리소스 (UTF-8). 없으면 null.</summary>
+        public static string ReadTextResource(string name)
+        {
+            using (var s = typeof(Program).Assembly.GetManifestResourceStream(name))
+            {
+                if (s == null)
+                    return null;
+                using (var r = new StreamReader(s, System.Text.Encoding.UTF8))
+                    return r.ReadToEnd();
+            }
+        }
+
         [STAThread]
         private static int Main(string[] args)
         {
