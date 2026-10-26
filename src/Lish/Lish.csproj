@@ -1,0 +1,58 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- .NET Framework 4.8: Windows 10(1903+)/11 기본 탑재 → 사내 PC에 런타임 설치 불필요 -->
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Lish</RootNamespace>
+    <AssemblyName>lish</AssemblyName>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <Version>0.0.2</Version>
+    <Product>LISH - Lightweight SSH</Product>
+    <Description>Lightweight SSH &amp; SFTP Client for Windows</Description>
+    <Company>LISH</Company>
+    <Copyright>LISH</Copyright>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!-- 앱 아이콘: build.ps1 이 lish.exe 의 make-icon 옵션으로 생성 -->
+  <PropertyGroup Condition="Exists('assets\lish.ico')">
+    <ApplicationIcon>assets\lish.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
+    <!-- net48 빌드용 참조 어셈블리 (Developer Pack 미설치 환경 대응) -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Security" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+
+  <!-- 내장 글꼴 D2Coding (SIL OFL 1.1, assets\fonts\OFL.txt). 런타임에 Ui.EmbeddedFonts 가 등록한다. -->
+  <ItemGroup>
+    <EmbeddedResource Include="assets\fonts\D2Coding-Regular.ttf.gz" LogicalName="font.D2Coding.Regular.ttf.gz" />
+    <EmbeddedResource Include="assets\fonts\D2Coding-Bold.ttf.gz" LogicalName="font.D2Coding.Bold.ttf.gz" />
+  </ItemGroup>
+
+  <!--
+    의존 DLL을 exe 리소스로 내장 → lish.exe 하나만 복사해도 실행 (사내망 배포용).
+    런타임에 Program.ResolveEmbedded 가 로드한다.
+  -->
+  <Target Name="EmbedReferencedAssemblies" AfterTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <EmbeddedResource Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'">
+        <LogicalName>lib.%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
+
+</Project>

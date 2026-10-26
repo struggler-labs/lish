@@ -1,0 +1,33 @@
+# PR 빌드 검사: main 으로 들어오는 PR 마다 빌드하고 결과물(exe)을 아티팩트로 남긴다.
+name: Build
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lish-${{ github.sha }}
+          path: |
+            dist/lish.exe
+            dist/lish.exe.config
+            dist/D2Coding-OFL.txt
+          retention-days: 14

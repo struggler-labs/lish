@@ -1,0 +1,25 @@
+# 빌드 산출물
+bin/
+obj/
+dist/
+*.zip
+
+# IDE / 사용자별 파일
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# 런타임 데이터 (세션·비밀번호·known_hosts — 절대 올리지 않음)
+lish-data/
+hosts.json
+folders.json
+settings.json
+known_hosts
+*.bak
+*.tmp
+
+# 내부 업무 기록 / 로컬 도구 설정
+WORKLOG.md
+.claude/
