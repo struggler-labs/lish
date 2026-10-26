@@ -1,0 +1,83 @@
+# 자동 릴리스: main 에 push(PR 병합) 되면 src/Lish/Lish.csproj 의 <Version> 을 읽어
+# v<버전> 태그가 아직 없을 때만 빌드 → 태그 + GitHub Release 생성 (노트는 CHANGELOG.md 의 해당 버전 항목).
+# 새 릴리스를 내려면 PR 에서 <Version> 을 올리고 CHANGELOG.md 에 그 버전 항목을 추가하면 된다.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          [xml]$proj = Get-Content src/Lish/Lish.csproj -Raw
+          $version = @($proj.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ })[0]
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Lish.csproj 의 <Version> 이 올바르지 않습니다: '$version'" }
+          $tag = "v$version"
+          $exists = [bool](git ls-remote --tags origin "refs/tags/$tag")
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag"         >> $env:GITHUB_OUTPUT
+          "exists=$($exists.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          if ($exists) { Write-Host "$tag 릴리스가 이미 있어 건너뜁니다." } else { Write-Host "$tag 릴리스를 만듭니다." }
+
+      - name: Release notes from CHANGELOG
+        if: steps.ver.outputs.exists == 'false'
+        shell: pwsh
+        run: |
+          $version = '${{ steps.ver.outputs.version }}'
+          $lines = Get-Content CHANGELOG.md -Encoding utf8
+          $start = [Array]::FindIndex($lines, [Predicate[string]]{ param($l) $l -match "^## \[$([regex]::Escape($version))\]" })
+          if ($start -lt 0) { throw "CHANGELOG.md 에 '## [$version]' 항목이 없습니다." }
+          $end = [Array]::FindIndex($lines, $start + 1, [Predicate[string]]{ param($l) $l -match '^## \[' -or $l -match '^\[[^\]]+\]: ' })
+          if ($end -lt 0) { $end = $lines.Length }
+          $notes = ($lines[($start + 1)..($end - 1)] -join "`n").Trim()
+          Set-Content release-notes.md $notes -Encoding utf8
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.ver.outputs.exists == 'false'
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        if: steps.ver.outputs.exists == 'false'
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: Package
+        if: steps.ver.outputs.exists == 'false'
+        shell: pwsh
+        run: |
+          $name = "lish-${{ steps.ver.outputs.tag }}-win"
+          New-Item -ItemType Directory -Force "pkg/$name" | Out-Null
+          Copy-Item dist/lish.exe, dist/lish.exe.config, dist/D2Coding-OFL.txt, LICENSE, README.md, CHANGELOG.md "pkg/$name"
+          Compress-Archive -Path "pkg/$name/*" -DestinationPath "pkg/$name.zip"
+          Copy-Item dist/lish.exe pkg/lish.exe
+          $sums = Get-ChildItem pkg -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name }
+          Set-Content pkg/SHA256SUMS.txt $sums -Encoding ascii
+
+      - name: Create GitHub Release
+        if: steps.ver.outputs.exists == 'false'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ steps.ver.outputs.tag }}'
+          gh release create $tag (Get-ChildItem pkg -File).FullName `
+            --target $env:GITHUB_SHA `
+            --title "LISH $tag" `
+            --notes-file release-notes.md
