@@ -8,6 +8,19 @@
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-11-01
+
+### Security
+- **릴리스 서명**: 릴리스 파일(lish.exe, zip)에 Sigstore 로 서명된 GitHub 빌드 출처 증명(SLSA provenance)을 붙이고,
+  증명 번들을 `lish-v<버전>.sigstore.json` 으로 함께 올린다. 검증: `gh attestation verify lish.exe --repo struggler-labs/lish`.
+- `SECURITY.md` 보안 정책 추가: GitHub 비공개 취약점 제보로 신고, 지원 버전, 처리 절차.
+- CI 보안 점검: OpenSSF Scorecard, Trivy(의존성 취약점 · 비밀 값 · 설정 오류), CodeQL(C# 소스 정적 분석).
+- 워크플로 강화: 모든 액션을 커밋 SHA 로 고정, 토큰 권한 최소화(쓰기 권한은 릴리스 잡에만), checkout 자격 증명 미보관.
+- Dependabot 으로 NuGet · GitHub Actions 의존성 주간 업데이트. NuGet `packages.lock.json` 으로 하위 의존성까지 고정.
+
+### Docs
+- README 에 Scorecard · Build · Trivy · CodeQL 배지와 SECURITY.md 링크 추가.
+
 ## [0.0.5] - 2026-10-31
 
 ### Security
@@ -77,7 +90,8 @@ Windows 10/11용 WinForms GUI 클라이언트 첫 공개 버전입니다.
 - SSH.NET 2026.0.0 사용 (2025.0.0 의 GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284 회피).
 - 호스트 키 확인 창의 Enter 기본값은 '취소' — 키 신뢰는 버튼을 직접 눌러야 합니다.
 
-[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.6...HEAD
+[0.0.6]: https://github.com/struggler-labs/lish/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/struggler-labs/lish/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/struggler-labs/lish/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/struggler-labs/lish/compare/v0.0.2...v0.0.3
