@@ -19,6 +19,27 @@ namespace Lish.Ui
 
         public SessionView Selected { get; private set; }
 
+        // 좌우 분할 그룹 (왼쪽 칸, 오른쪽 칸). 탭 바에서 붙여서 한 묶음으로 그린다.
+        private SessionView _groupLeft, _groupRight;
+        private Rectangle _groupRect;
+
+        /// <summary>분할 그룹을 정한다 (null 이면 해제). 오른쪽 탭은 왼쪽 탭 바로 뒤로 옮긴다.</summary>
+        public void SetGroup(SessionView left, SessionView right)
+        {
+            if (left == null || right == null || !_tabs.Contains(left) || !_tabs.Contains(right))
+                left = right = null;
+            else
+            {
+                _tabs.Remove(right);
+                _tabs.Insert(_tabs.IndexOf(left) + 1, right);
+            }
+            _groupLeft = left;
+            _groupRight = right;
+            Invalidate();
+        }
+
+        private bool InGroup(SessionView v) => v != null && (v == _groupLeft || v == _groupRight);
+
         public event EventHandler SelectedChanged;
         public event Action<SessionView> CloseRequested;
         public event EventHandler AddRequested;
@@ -48,6 +69,8 @@ namespace Lish.Ui
             var idx = _tabs.IndexOf(view);
             if (idx < 0) return;
             _tabs.RemoveAt(idx);
+            if (InGroup(view))
+                _groupLeft = _groupRight = null;
             if (Selected == view)
                 Select(_tabs.Count == 0 ? null : _tabs[Math.Min(idx, _tabs.Count - 1)]);
             Invalidate();
@@ -78,13 +101,28 @@ namespace Lish.Ui
             var right = Width - Theme.Scale(92);
             var maxW = Theme.Scale(220);
             var minW = Theme.Scale(110);
-            var avail = Math.Max(minW, (right - x - Theme.Scale(36)) / Math.Max(1, _tabs.Count) - Theme.Scale(4));
+            var groupExtra = _groupLeft != null ? Theme.Scale(36) : 0;   // 분할 그룹의 아이콘 칸 + 여백
+            var avail = Math.Max(minW, (right - x - Theme.Scale(36) - groupExtra) / Math.Max(1, _tabs.Count) - Theme.Scale(4));
+            _groupRect = Rectangle.Empty;
+            var groupIcon = Theme.Scale(26);
             foreach (var t in _tabs)
             {
+                // 분할 그룹: 앞에 분할 아이콘 칸, 묶음 테두리 안쪽 여백
+                if (t == _groupLeft)
+                {
+                    x += Theme.Scale(2);
+                    _groupRect = new Rectangle(x, Theme.Scale(3), 0, Height - Theme.Scale(3));
+                    x += groupIcon;
+                }
                 var textW = TextRenderer.MeasureText(g, TitleOf(t), Theme.UiFont).Width;
                 var w = Math.Min(Math.Min(maxW, avail), Math.Max(minW, textW + Theme.Scale(60)));
                 _tabRects.Add(new Rectangle(x, top, w, h));
-                x += w + Theme.Scale(4);
+                x += w + Theme.Scale(t == _groupLeft ? 2 : 4);
+                if (t == _groupRight && !_groupRect.IsEmpty)
+                {
+                    _groupRect.Width = x - _groupRect.X;
+                    x += Theme.Scale(6);
+                }
             }
             _addRect = new Rectangle(x + Theme.Scale(2), top + Theme.Scale(4), Theme.Scale(28), h - Theme.Scale(8));
             // 오른쪽 끝: [정보] [설정] (SFTP 는 사이드바 SFTP 탭)
@@ -105,12 +143,31 @@ namespace Lish.Ui
             using (var line = new Pen(Theme.Border))
                 g.DrawLine(line, 0, Height - 1, Width, Height - 1);
 
+            // 분할 그룹 묶음: 연한 보라 배경 + 테두리, 앞에 분할 아이콘
+            var groupShown = InGroup(Selected);
+            if (_groupRect.Width > 0)
+            {
+                var gr = new RectangleF(_groupRect.X + 0.5f, _groupRect.Y + 0.5f, _groupRect.Width - 1, _groupRect.Height + Theme.Scale(8));
+                using (var path = Theme.RoundRect(gr, Theme.Scale(9)))
+                using (var b = new SolidBrush(groupShown ? Theme.PrimarySoft : Theme.PrimarySofter))
+                using (var p = new Pen(groupShown ? Theme.Accent : Color.FromArgb(0xDD, 0xD5, 0xFB)))
+                {
+                    g.SetClip(new Rectangle(_groupRect.X - 1, _groupRect.Y - 1, _groupRect.Width + 2, Height - _groupRect.Y));
+                    g.FillPath(b, path);
+                    g.DrawPath(p, path);
+                    g.ResetClip();
+                }
+                Theme.DrawIcon(g, Theme.IconSplit, Theme.IconsSmall, groupShown ? Theme.Primary : Theme.Accent,
+                    new Rectangle(_groupRect.X + Theme.Scale(2), _groupRect.Y, Theme.Scale(24), _groupRect.Height));
+            }
+
             for (var i = 0; i < _tabs.Count; i++)
             {
                 var t = _tabs[i];
                 var r = _tabRects[i];
                 var active = t == Selected;
                 var hover = i == _hover;
+                var companion = groupShown && InGroup(t) && !active;   // 분할로 함께 보이는 다른 칸
 
                 if (active || hover)
                 {
@@ -144,7 +201,7 @@ namespace Lish.Ui
                     g.FillEllipse(b, r.X + Theme.Scale(12), r.Y + (r.Height - ds) / 2f, ds, ds);
 
                 var textRect = new Rectangle(r.X + Theme.Scale(26), r.Y, r.Width - Theme.Scale(58), r.Height);
-                TextRenderer.DrawText(g, TitleOf(t), active ? Theme.UiBold : Theme.UiFont, textRect, active ? Theme.Ink : Theme.SubText,
+                TextRenderer.DrawText(g, TitleOf(t), active ? Theme.UiBold : Theme.UiFont, textRect, active || companion ? Theme.Ink : Theme.SubText,
                     TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
 
                 if (active || hover)

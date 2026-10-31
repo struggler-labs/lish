@@ -14,7 +14,6 @@ namespace Lish.Ui
     /// <summary>탭 하나: 터미널 + SSH 세션 수명 관리. SFTP 패널은 사이드바 SFTP 탭이 이 탭용으로 하나 만들어 보관한다.</summary>
     internal sealed class SessionView : UserControl
     {
-        private readonly ProfileStore _store;
         private readonly object _sendLock = new object();
 
         private SshSession _session;
@@ -22,21 +21,21 @@ namespace Lish.Ui
         private Encoding _encoding;
         private volatile bool _closing;
         private SftpPanel _sftp;
-        private volatile RemoteProbe _probe;
+        private volatile string _shellCwd;
+        private string _shellCwdHost;
 
         public HostProfile Profile { get; }
         public TerminalControl Term { get; }
         public SessionState State { get; private set; } = SessionState.Idle;
         public string RemoteTitle { get; private set; }
 
-        /// <summary>터미널 연결로 셸 폴더/서버 자원을 조회하는 도구. 연결됐을 때만 있다 (작업 스레드에서만 호출).</summary>
-        public RemoteProbe Probe => _probe;
-        /// <summary>Probe 호출을 직렬화 (CPU 사용률은 연속 호출 사이의 차이로 계산되므로 섞이지 않게)</summary>
-        public readonly object ProbeLock = new object();
-        /// <summary>하단 상태바용 최근 서버 자원 (UI 스레드에서만 읽고 쓴다)</summary>
-        public RemoteStats Stats { get; set; }
-        /// <summary>자원 조회가 진행 중인지 (UI 스레드에서만)</summary>
-        public bool StatsPolling { get; set; }
+        /// <summary>
+        /// 셸이 OSC 7 로 알린 현재 폴더 (모르면 null). 서버에 명령을 보내지 않고 셸이 터미널에 출력한 값만 쓴다.
+        /// 아무 스레드에서나 읽어도 된다.
+        /// </summary>
+        public string ShellCwd => _shellCwd;
+        /// <summary>ShellCwd 가 바뀌었을 때 (UI 스레드)</summary>
+        public event EventHandler ShellCwdChanged;
         /// <summary>SFTP '터미널 폴더 따라가기' 가 마지막으로 따라간 셸 폴더 (UI 스레드)</summary>
         public string FollowedCwd { get; set; }
         /// <summary>이 탭의 SFTP 패널 (아직 안 열었으면 null)</summary>
@@ -44,10 +43,9 @@ namespace Lish.Ui
 
         public event EventHandler StateChanged;
 
-        public SessionView(HostProfile profile, ProfileStore store, AppSettings settings)
+        public SessionView(HostProfile profile, AppSettings settings)
         {
             Profile = profile;
-            _store = store;
             BackColor = Theme.TerminalBg;
 
             Term = new TerminalControl(settings) { Dock = DockStyle.Fill };
@@ -58,6 +56,7 @@ namespace Lish.Ui
                 RemoteTitle = t;
                 StateChanged?.Invoke(this, EventArgs.Empty);
             };
+            Term.CwdChanged += OnShellCwd;
 
             Controls.Add(Term);
         }
@@ -85,14 +84,12 @@ namespace Lish.Ui
             Exception error = null;
             try
             {
-                var session = SshSession.Open(profile, _store, ui);
+                var session = SshSession.Open(profile, ui);
                 // 비밀번호 입력 등으로 사용자 이름이 정해졌으면 반영
                 Profile.User = profile.User;
                 _session = session;
-                session.StartForwards();
                 var shell = session.Client.CreateShellStream(profile.TermOrDefault, (uint)Term.Columns, (uint)Term.RowsCount, 0, 0, 64 * 1024);
                 _shell = shell;
-                _probe = new RemoteProbe(session.Client);
                 SetState(SessionState.Connected);
                 ReadLoop(shell);
             }
@@ -120,7 +117,6 @@ namespace Lish.Ui
                 case Renci.SshNet.Common.SshAuthenticationException _: return "인증 실패: " + ex.Message;
                 case Renci.SshNet.Common.SshOperationTimeoutException _: return "연결 시간 초과: " + ex.Message;
                 case System.Net.Sockets.SocketException se: return $"네트워크 오류 ({se.SocketErrorCode}): {se.Message}";
-                case Renci.SshNet.Common.ProxyException _: return "프록시 오류: " + ex.Message;
                 case OperationCanceledException _: return "접속이 취소되었습니다.";
                 default: return ex.Message;
             }
@@ -154,7 +150,6 @@ namespace Lish.Ui
         {
             var shell = _shell;
             var session = _session;
-            _probe = null;
             _shell = null;
             _session = null;
             try { shell?.Dispose(); } catch { /* 이미 닫힘 */ }
@@ -211,8 +206,9 @@ namespace Lish.Ui
                     {
                         if (state != SessionState.Connected)
                         {
-                            Stats = null;
                             FollowedCwd = null;
+                            _shellCwd = null;
+                            _shellCwdHost = null;
                         }
                         StateChanged?.Invoke(this, EventArgs.Empty);
                         if (state == SessionState.Connected && _sftp != null)
@@ -240,25 +236,26 @@ namespace Lish.Ui
         public SftpPanel GetOrCreateSftp()
         {
             if (_sftp == null || _sftp.IsDisposed)
-                _sftp = new SftpPanel(OpenSftp, Profile.GetEncoding(), QueryShellCwd) { Dock = DockStyle.Fill };
+                _sftp = new SftpPanel(OpenSftp, Profile.GetEncoding(), () => _shellCwd) { Dock = DockStyle.Fill };
             return _sftp;
         }
 
-        /// <summary>터미널 셸의 현재 폴더 (작업 스레드에서 호출). 모르면 null.</summary>
-        public string QueryShellCwd()
+        /// <summary>
+        /// OSC 7 수신. 처음 알려 온 호스트를 이 연결의 셸로 보고, 다른 호스트 이름은 무시한다
+        /// (터미널 안에서 다시 ssh 로 들어간 서버의 폴더를 이 서버 SFTP 에서 따라가지 않도록).
+        /// </summary>
+        private void OnShellCwd(string host, string path)
         {
-            var probe = _probe;
-            if (probe == null)
-                return null;
-            try
-            {
-                lock (ProbeLock)
-                    return probe.QueryShellCwd();
-            }
-            catch (Exception)
-            {
-                return null;   // 조회 실패는 '모름' 으로 (SFTP 는 홈 폴더로 연다)
-            }
+            if (State != SessionState.Connected)
+                return;
+            if (_shellCwdHost == null)
+                _shellCwdHost = host;
+            else if (!string.Equals(_shellCwdHost, host, StringComparison.OrdinalIgnoreCase))
+                return;
+            if (path == _shellCwd)
+                return;
+            _shellCwd = path;
+            ShellCwdChanged?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>테스트 훅: 터미널에 입력한 것처럼 보낸다</summary>

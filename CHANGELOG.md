@@ -8,6 +8,32 @@
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-10-31
+
+### Security
+- **서버에서 자동으로 명령을 실행하지 않음**: 원격 모니터(5초마다 `/proc/stat`·`/proc/meminfo`·`df` 조회)와
+  exec 채널 방식의 셸 폴더 조회(2초마다 `/proc` 전체 순회)를 없앴다. 사용자가 입력하지 않은 명령이 서버 감사 로그에 남지 않는다.
+- **비밀번호 저장 기능 삭제**: 세션 편집에서 비밀번호 입력란과 저장 스위치를 없앴다. 예전 버전이 `hosts.json` 에 저장한
+  비밀번호(DPAPI 암호문)는 시작할 때 지우고 파일을 다시 저장한다.
+- **점프 호스트 · 프록시 · 포트 포워딩(-L / -D) 삭제**: 접근통제를 우회하는 터널이 될 수 있어 기능을 없앴다.
+  세션 편집 고급 설정에는 터미널 · 메모만 남는다. 예전 세션의 해당 값은 무시되고 다음 저장 때 `hosts.json` 에서 빠진다
+  (점프 호스트를 쓰던 세션은 이제 대상 호스트로 직접 접속을 시도한다).
+
+### Added
+- **좌우 2분할 화면**: 탭 우클릭 → "오른쪽에 분할로 보기" 로 두 탭을 나란히 표시. 두 탭은 탭 바에서 분할 아이콘이 붙은
+  하나의 그룹으로 묶여 보인다. 그룹의 탭을 고르면 분할 화면, 다른 탭을 고르면 그 탭만 보이고 그룹은 그대로 남는다.
+  활성 칸은 보라색 테두리, 칸을 클릭하면 활성 칸이 바뀐다(상태바·SFTP 가 그 칸 기준). 가운데 경계선을 끌어 폭 조절(두 번 클릭 = 반반),
+  "분할 해제 (그룹 풀기)" 또는 그룹의 탭을 닫으면 원래대로.
+
+### Changed
+- **터미널 폴더 따라가기**: 셸이 프롬프트마다 보내는 OSC 7(`file://호스트/경로`)로 현재 폴더를 알아낸다. 셸 설정이 필요하다
+  (bash: `PROMPT_COMMAND='printf "\e]7;file://%s%s\a" "$HOSTNAME" "$PWD"'`). 처음 알린 호스트와 다른 호스트(터미널 안에서 다시 ssh 한 서버)는 무시한다.
+  SFTP 를 처음 열 때도 이 값을 쓰고, 모르면 홈 폴더에서 연다.
+
+### Removed
+- 하단 상태바의 원격 모니터(CPU · RAM · Disk).
+- 세션 편집의 네트워크(점프 호스트 · 프록시) · 포트 포워딩 항목.
+
 ## [0.0.4] - 2026-10-26
 
 ### Added
@@ -51,7 +77,8 @@ Windows 10/11용 WinForms GUI 클라이언트 첫 공개 버전입니다.
 - SSH.NET 2026.0.0 사용 (2025.0.0 의 GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284 회피).
 - 호스트 키 확인 창의 Enter 기본값은 '취소' — 키 신뢰는 버튼을 직접 눌러야 합니다.
 
-[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/struggler-labs/lish/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/struggler-labs/lish/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/struggler-labs/lish/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/struggler-labs/lish/releases/tag/v0.0.2

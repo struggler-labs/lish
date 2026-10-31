@@ -453,6 +453,30 @@ namespace Lish.Terminal
                 Title = s.Substring(sep + 1);
                 TitleChanged?.Invoke(Title);
             }
+            else if (cmd == "7")
+            {
+                var cwd = ParseCwdUri(s.Substring(sep + 1));
+                if (cwd != null)
+                    CwdChanged?.Invoke(cwd.Value.host, cwd.Value.path);
+            }
+        }
+
+        /// <summary>OSC 7 "file://호스트/경로" (경로는 % 인코딩) → (호스트, 경로). 형식이 틀리면 null.</summary>
+        internal static (string host, string path)? ParseCwdUri(string uri)
+        {
+            var scheme = uri.IndexOf("://", StringComparison.Ordinal);
+            if (scheme <= 0)
+                return null;
+            var rest = uri.Substring(scheme + 3);
+            var slash = rest.IndexOf('/');
+            if (slash < 0)
+                return null;
+            string path;
+            try { path = Uri.UnescapeDataString(rest.Substring(slash)); }
+            catch (Exception) { return null; }
+            if (path.Length == 0 || path[0] != '/' || path.IndexOf('\0') >= 0)
+                return null;
+            return (rest.Substring(0, slash), path);
         }
 
         private void AlignmentTest()

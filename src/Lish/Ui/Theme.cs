@@ -73,6 +73,8 @@ namespace Lish.Ui
         public const string IconMoveTo = "\uE8DE";
         public const string IconPlay = "\uE768";
         public const string IconNewWindow = "\uE8A7";
+        public const string IconSplit = "\uE90D";
+        public const string IconUnsplit = "\uE740";
 
         private static string PickUiFont()
         {

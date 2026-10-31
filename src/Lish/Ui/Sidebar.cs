@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using Lish.Core;
 
@@ -128,7 +127,6 @@ namespace Lish.Ui
         private readonly Timer _timer;
         private readonly ToolTip _tips = new ToolTip();
         private SessionView _view;
-        private bool _polling;
 
         private static readonly Font BigIcon = new Font(Theme.Icons.FontFamily, 22f);
 
@@ -150,7 +148,11 @@ namespace Lish.Ui
             // 아래: 터미널 폴더 따라가기
             var bottom = new Panel { Dock = DockStyle.Bottom, Height = Theme.Scale(38), BackColor = Theme.Sidebar, Padding = new Padding(Theme.Scale(12), 0, Theme.Scale(8), 0) };
             _follow = new Toggle("터미널 폴더 따라가기") { Dock = DockStyle.Left, Checked = settings.SftpFollowTerminal };
-            _tips.SetToolTip(_follow, "터미널에서 cd 로 폴더를 옮기면 SFTP 목록도 그 폴더로 따라갑니다.\n전송 중이거나 경로를 입력하는 동안은 기다렸다가 따라갑니다.");
+            _tips.SetToolTip(_follow, "터미널에서 cd 로 폴더를 옮기면 SFTP 목록도 그 폴더로 따라갑니다.\n" +
+                "서버에 명령을 보내지 않고, 셸이 프롬프트마다 알려 주는 현재 폴더(OSC 7)를 씁니다.\n" +
+                "셸이 알려 주지 않으면 따라가지 않습니다. bash 는 ~/.bashrc 에 다음 줄을 추가하세요:\n" +
+                "PROMPT_COMMAND='printf \"\\e]7;file://%s%s\\a\" \"$HOSTNAME\" \"$PWD\"'\n" +
+                "전송 중이거나 경로를 입력하는 동안은 기다렸다가 따라갑니다.");
             _follow.CheckedChanged += (s, e) =>
             {
                 _settings.SftpFollowTerminal = _follow.Checked;
@@ -182,9 +184,18 @@ namespace Lish.Ui
         /// <summary>선택된 터미널 탭이 바뀌었거나 그 탭의 연결 상태가 바뀌었을 때 호출.</summary>
         public void ShowFor(SessionView view)
         {
+            if (_view != view)
+            {
+                if (_view != null)
+                    _view.ShellCwdChanged -= OnShellCwdChanged;
+                if (view != null)
+                    view.ShellCwdChanged += OnShellCwdChanged;
+            }
             _view = view;
             UpdateView();
         }
+
+        private void OnShellCwdChanged(object sender, EventArgs e) => Poll();
 
         private void UpdateView()
         {
@@ -226,28 +237,24 @@ namespace Lish.Ui
                 UpdateView();
         }
 
-        /// <summary>셸의 현재 폴더를 작업 스레드에서 묻고, 바뀌었으면 SFTP 목록을 옮긴다.</summary>
+        /// <summary>
+        /// 셸이 OSC 7 로 알린 폴더가 바뀌었으면 SFTP 목록을 옮긴다 (서버에 묻지 않음).
+        /// 전송 중 등으로 지금 못 옮기면 타이머가 다시 부른다.
+        /// </summary>
         private void Poll()
         {
             var view = _view;
-            if (_polling || !_follow.Checked || !Visible || view == null || view.IsDisposed || view.State != SessionState.Connected || view.Probe == null)
+            if (!_follow.Checked || !Visible || view == null || view.IsDisposed || view.State != SessionState.Connected)
                 return;
             var panel = view.Sftp;
             if (panel == null || !panel.IsConnected || panel.Busy)
                 return;
-            _polling = true;
-            Task.Run(() => view.QueryShellCwd()).ContinueWith(t =>
-            {
-                _polling = false;
-                if (IsDisposed || view.IsDisposed || view != _view || panel.IsDisposed || !_follow.Checked)
-                    return;
-                var cwd = t.Result;
-                // 셸 폴더가 바뀌었을 때만 따라간다 → 사용자가 SFTP 에서 직접 옮긴 폴더는 셸이 cd 할 때까지 유지
-                if (string.IsNullOrEmpty(cwd) || cwd == view.FollowedCwd)
-                    return;
-                if (panel.FollowTo(cwd))
-                    view.FollowedCwd = cwd;
-            }, TaskScheduler.FromCurrentSynchronizationContext());
+            var cwd = view.ShellCwd;
+            // 셸 폴더가 바뀌었을 때만 따라간다 → 사용자가 SFTP 에서 직접 옮긴 폴더는 셸이 cd 할 때까지 유지
+            if (string.IsNullOrEmpty(cwd) || cwd == view.FollowedCwd)
+                return;
+            if (panel.FollowTo(cwd))
+                view.FollowedCwd = cwd;
         }
 
         private void PaintCaption(object sender, PaintEventArgs e)

@@ -17,51 +17,21 @@ namespace Lish.Core
         void Status(string message);
     }
 
-    /// <summary>점프 호스트 체인과 포워딩을 포함한 하나의 SSH 연결.</summary>
+    /// <summary>하나의 SSH 연결. 점프 호스트·프록시·포트 포워딩은 지원하지 않는다 (보안 정책상 기능 삭제).</summary>
     internal sealed class SshSession : IDisposable
     {
-        private const int MaxJumpDepth = 5;
-
         public SshClient Client { get; private set; }
         public HostProfile Profile { get; private set; }
 
-        private SshSession _jump;
         private IUserInteraction _ui;
-        private string _connectHost;
-        private int _connectPort;
         private string _password;
         private List<IPrivateKeySource> _keys;
-        private readonly List<ForwardedPort> _forwards = new List<ForwardedPort>();
 
-        public static SshSession Open(HostProfile profile, ProfileStore store, IUserInteraction ui) => Open(profile, store, ui, 0);
-
-        private static SshSession Open(HostProfile profile, ProfileStore store, IUserInteraction ui, int depth)
+        public static SshSession Open(HostProfile profile, IUserInteraction ui)
         {
-            if (depth > MaxJumpDepth)
-                throw new InvalidOperationException("점프 호스트 체인이 너무 깁니다(순환 참조?).");
-
             var session = new SshSession { Profile = profile, _ui = ui };
             try
             {
-                session._connectHost = profile.Host;
-                session._connectPort = profile.Port;
-
-                if (!string.IsNullOrEmpty(profile.Jump))
-                {
-                    var jumpProfile = Address.ResolveDestination(profile.Jump, store);
-                    // 프록시는 첫 번째 홉에만 적용된다.
-                    if (string.IsNullOrEmpty(jumpProfile.Proxy))
-                        jumpProfile.Proxy = profile.Proxy;
-                    ui.Status($"점프 호스트 {jumpProfile.Display()} 경유...");
-                    session._jump = Open(jumpProfile, store, ui, depth + 1);
-
-                    var tunnel = new ForwardedPortLocal("127.0.0.1", 0, profile.Host, (uint)profile.Port);
-                    session._jump.Client.AddForwardedPort(tunnel);
-                    tunnel.Start();
-                    session._connectHost = "127.0.0.1";
-                    session._connectPort = (int)tunnel.BoundPort;
-                }
-
                 session.Client = session.Connect();
                 return session;
             }
@@ -72,29 +42,7 @@ namespace Lish.Core
             }
         }
 
-        public void StartForwards()
-        {
-            foreach (var spec in Profile.LocalForwardList)
-            {
-                var fwd = ParseLocalForward(spec);
-                Client.AddForwardedPort(fwd);
-                fwd.Exception += (s, e) => _ui.Status($"[포워딩 {spec}] {e.Exception.Message}");
-                fwd.Start();
-                _forwards.Add(fwd);
-                _ui.Status($"로컬 포워딩: {fwd.BoundHost}:{fwd.BoundPort} → {fwd.Host}:{fwd.Port}");
-            }
-            foreach (var spec in Profile.DynamicForwardList)
-            {
-                var fwd = ParseDynamicForward(spec);
-                Client.AddForwardedPort(fwd);
-                fwd.Exception += (s, e) => _ui.Status($"[SOCKS {spec}] {e.Exception.Message}");
-                fwd.Start();
-                _forwards.Add(fwd);
-                _ui.Status($"SOCKS 프록시: {fwd.BoundHost}:{fwd.BoundPort}");
-            }
-        }
-
-        /// <summary>같은 경로(점프 터널 포함)와 이미 확인된 자격증명으로 SFTP 채널용 연결을 연다.</summary>
+        /// <summary>이미 확인된 자격증명으로 SFTP 채널용 연결을 연다.</summary>
         public SftpClient OpenSftp()
         {
             while (true)
@@ -122,35 +70,6 @@ namespace Lish.Core
             }
         }
 
-        /// <summary>[bind:]lport:host:hport</summary>
-        public static ForwardedPortLocal ParseLocalForward(string spec)
-        {
-            var p = spec.Split(':');
-            if (p.Length == 3)
-                return new ForwardedPortLocal("127.0.0.1", ParsePort(p[0]), p[1], ParsePort(p[2]));
-            if (p.Length == 4)
-                return new ForwardedPortLocal(p[0].Length == 0 || p[0] == "*" ? "0.0.0.0" : p[0], ParsePort(p[1]), p[2], ParsePort(p[3]));
-            throw new FormatException($"잘못된 로컬 포워딩 형식: {spec}  (예: 8080:10.0.0.5:80)");
-        }
-
-        /// <summary>[bind:]port</summary>
-        public static ForwardedPortDynamic ParseDynamicForward(string spec)
-        {
-            var p = spec.Split(':');
-            if (p.Length == 1)
-                return new ForwardedPortDynamic("127.0.0.1", ParsePort(p[0]));
-            if (p.Length == 2)
-                return new ForwardedPortDynamic(p[0].Length == 0 || p[0] == "*" ? "0.0.0.0" : p[0], ParsePort(p[1]));
-            throw new FormatException($"잘못된 SOCKS 포트 형식: {spec}  (예: 1080)");
-        }
-
-        private static uint ParsePort(string s)
-        {
-            if (!uint.TryParse(s, out var port) || port > 65535)
-                throw new FormatException($"잘못된 포트: {s}");
-            return port;
-        }
-
         private sealed class HostKeyCheck
         {
             public HostKeyStatus Status = HostKeyStatus.Trusted;
@@ -168,7 +87,6 @@ namespace Lish.Core
             var check = new HostKeyCheck();
             client.HostKeyReceived += (s, e) =>
             {
-                // 점프 터널 경유 시에도 실제 대상 호스트 이름으로 검증한다.
                 check.KeyType = e.HostKeyName;
                 check.Key = e.HostKey;
                 check.Status = KnownHosts.Check(Profile.Host, Profile.Port, e.HostKeyName, e.HostKey);
@@ -204,10 +122,10 @@ namespace Lish.Core
             }
 
             _keys = LoadKeys(p);
-            _password = Secret.Unprotect(p.SavedPassword);
             const int maxPasswordPrompts = 3;
             var passwordPrompts = 0;
 
+            // 비밀번호는 저장하지 않는다. 처음엔 키/keyboard-interactive 로 시도하고, 인증 실패 시 묻는다.
             // 키 인증이 한 번 실패하면 이후 재접속에서는 키를 빼고 비밀번호만 시도한다.
             // (SSH.NET 은 RSA 키를 서명 알고리즘별로 여러 번 시도하므로 서버 MaxAuthTries 를 빨리 소진한다)
             var useKeys = _keys.Count > 0;
@@ -316,7 +234,7 @@ namespace Lish.Core
                     }
                     else
                     {
-                        // OTP 등 서버가 요구하는 추가 입력. 저장된 비밀번호 없이 PAM 이 "Password:" 를 물으면 비밀번호 창으로 보인다.
+                        // OTP 등 서버가 요구하는 추가 입력. 앞서 입력한 비밀번호 없이 PAM 이 "Password:" 를 물으면 비밀번호 창으로 보인다.
                         var message = string.IsNullOrEmpty(e.Instruction) ? prompt.Request : e.Instruction + "\n" + prompt.Request;
                         prompt.Response = _ui.Prompt(isPassword ? "비밀번호" : "추가 인증", message.Trim(), !prompt.IsEchoed) ?? "";
                     }
@@ -329,35 +247,7 @@ namespace Lish.Core
         {
             var p = Profile;
             var methods = methodList.ToArray();
-            ConnectionInfo info;
-            if (_jump != null || string.IsNullOrEmpty(p.Proxy))
-            {
-                info = new ConnectionInfo(_connectHost, _connectPort, user, methods);
-            }
-            else
-            {
-                if (!Uri.TryCreate(p.Proxy, UriKind.Absolute, out var uri))
-                    throw new FormatException($"잘못된 프록시 주소: {p.Proxy}  (예: http://proxy:8080, socks5://proxy:1080)");
-
-                ProxyTypes type;
-                switch (uri.Scheme.ToLowerInvariant())
-                {
-                    case "http": type = ProxyTypes.Http; break;
-                    case "socks4": type = ProxyTypes.Socks4; break;
-                    case "socks5": case "socks": type = ProxyTypes.Socks5; break;
-                    default: throw new FormatException($"지원하지 않는 프록시 종류: {uri.Scheme}");
-                }
-
-                string proxyUser = null, proxyPass = null;
-                if (!string.IsNullOrEmpty(uri.UserInfo))
-                {
-                    var ui = uri.UserInfo.Split(new[] { ':' }, 2);
-                    proxyUser = Uri.UnescapeDataString(ui[0]);
-                    proxyPass = ui.Length > 1 ? Uri.UnescapeDataString(ui[1]) : null;
-                }
-                var proxyPort = uri.IsDefaultPort || uri.Port <= 0 ? (type == ProxyTypes.Http ? 8080 : 1080) : uri.Port;
-                info = new ConnectionInfo(_connectHost, _connectPort, user, type, uri.Host, proxyPort, proxyUser, proxyPass, methods);
-            }
+            var info = new ConnectionInfo(p.Host, p.Port, user, methods);
             info.Encoding = p.GetEncoding();
             info.Timeout = TimeSpan.FromSeconds(p.Timeout > 0 ? p.Timeout : 15);
             return info;
@@ -426,19 +316,12 @@ namespace Lish.Core
 
         public void Dispose()
         {
-            foreach (var f in _forwards)
-            {
-                try { f.Stop(); } catch { /* 종료 중 오류 무시 */ }
-            }
-            _forwards.Clear();
             if (Client != null)
             {
                 try { Client.Disconnect(); } catch { /* 이미 끊긴 경우 */ }
                 Client.Dispose();
                 Client = null;
             }
-            _jump?.Dispose();
-            _jump = null;
         }
     }
 }

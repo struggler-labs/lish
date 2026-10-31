@@ -24,8 +24,19 @@ namespace Lish.Ui
         private readonly SegmentedTabs _sideTabs;
         private readonly Panel _sessionsPage;
         private readonly SftpSidebar _sftpPage;
-        private readonly Timer _statsTimer;
         private bool _sidebarSftp;
+
+        // 좌우 2분할 그룹: 두 탭을 탭 바에서 한 묶음으로 보이고, 그룹의 탭을 고르면 두 칸을 나란히 보인다.
+        // 활성 칸의 탭이 _tabs.Selected 다. 그룹 밖의 탭을 고르면 그 탭만 보이고 그룹은 남는다.
+        private readonly Panel _splitBar;
+        private SessionView _left, _right;   // 그룹이 있을 때만 (아니면 null)
+        private double _splitRatio = 0.5;
+        private bool Split => _left != null && _right != null;
+        /// <summary>지금 분할 화면을 보이는 중인지 (그룹의 탭이 선택됨)</summary>
+        private bool ShowingSplit => Split && (_tabs.Selected == _left || _tabs.Selected == _right);
+        /// <summary>분할 칸 테두리 두께와 그 바깥 여백 (테두리가 창 가장자리·탭 바·경계선에 붙어 가려지지 않게)</summary>
+        private static int PaneBorder => Theme.Scale(2);
+        private static int PaneGap => Theme.Scale(4);
 
         /// <summary>SFTP 탭일 때 사이드바 최소/기본 폭 (아이콘 도구 모음 + 이름/크기 열이 들어가는 폭)</summary>
         private static int SftpMinWidth => Theme.Scale(260);
@@ -116,6 +127,10 @@ namespace Lish.Ui
             _content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.TerminalBg };
             _empty = BuildEmptyState();
             _content.Controls.Add(_empty);
+            _content.Resize += (s, e) => LayoutPanes();
+            _content.Paint += PaintPaneBorder;
+            _splitBar = BuildSplitBar();
+            _content.Controls.Add(_splitBar);
 
             var main = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Window };
             main.Controls.Add(_content);
@@ -124,8 +139,6 @@ namespace Lish.Ui
             // ── 상태바 ──
             _status = new Panel { Dock = DockStyle.Bottom, Height = Theme.Scale(28), BackColor = Color.White };
             _status.Paint += PaintStatus;
-            _statsTimer = new Timer { Interval = 5000 };
-            _statsTimer.Tick += (s, e) => PollStats();
 
             Controls.Add(main);
             Controls.Add(splitter);
@@ -248,157 +261,17 @@ namespace Lish.Ui
                     g.FillEllipse(b, x, (h - ds) / 2f, ds, ds);
                 x += Theme.Scale(14);
                 var text = $"{stateText}  ·  {v.Profile.Display()}";
-                var leftW = TextRenderer.MeasureText(g, text, Theme.Small).Width;
                 TextRenderer.DrawText(g, text, Theme.Small, new Point(x, (h - Theme.Small.Height) / 2), Theme.Ink);
 
                 var right = $"{(string.IsNullOrEmpty(v.Profile.Encoding) ? "UTF-8" : v.Profile.Encoding.ToUpperInvariant())}   ·   {v.Term.Columns}×{v.Term.RowsCount}   ·   {v.Profile.TermOrDefault}";
                 var sz = TextRenderer.MeasureText(g, right, Theme.Small);
                 var rightX = _status.Width - sz.Width - Theme.Scale(14);
                 TextRenderer.DrawText(g, right, Theme.Small, new Point(rightX, (h - Theme.Small.Height) / 2), Theme.SubText);
-
-                if (v.State == SessionState.Connected && v.Stats != null)
-                    PaintStats(g, v.Stats, x + leftW + Theme.Scale(24), rightX - Theme.Scale(12), h);
             }
             else
             {
                 TextRenderer.DrawText(g, $"LISH {Program.Version}  ·  세션 {_store.All.Count}개  ·  {Paths.DataDir}", Theme.Small,
                     new Point(x, (h - Theme.Small.Height) / 2), Theme.SubText);
-            }
-        }
-
-        /// <summary>
-        /// 원격 서버 자원: "CPU 12%  ·  RAM 1.2/3.8 GB  ·  Disk 18/50 GB (/)" 를 오른쪽 정보 왼쪽에 오른쪽 맞춤으로 그린다.
-        /// 값은 사용률에 따라 색 (80% 이상 Warning, 90% 이상 Danger). 자리가 모자라면 Disk → RAM → CPU 순으로 뺀다.
-        /// </summary>
-        private void PaintStats(Graphics g, RemoteStats st, int minX, int maxX, int h)
-        {
-            var parts = new System.Collections.Generic.List<(string label, string value, double? pct, string tail)>();
-            if (st.CpuPercent.HasValue)
-                parts.Add(("CPU", $"{st.CpuPercent.Value:0}%", st.CpuPercent, null));
-            if (st.MemTotal > 0 && st.MemUsed.HasValue)
-                parts.Add(("RAM", FormatPair(st.MemUsed.Value, st.MemTotal.Value), st.MemUsed.Value * 100.0 / st.MemTotal.Value, null));
-            if (st.DiskTotal > 0 && st.DiskUsed.HasValue)
-                parts.Add(("Disk", FormatPair(st.DiskUsed.Value, st.DiskTotal.Value), st.DiskUsed.Value * 100.0 / st.DiskTotal.Value,
-                    string.IsNullOrEmpty(st.DiskMount) ? null : $"({st.DiskMount})"));
-            const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
-            var gap = Theme.Scale(4);
-            var sep = "·";
-            var sepW = TextRenderer.MeasureText(g, sep, Theme.Small, Size.Empty, flags).Width + Theme.Scale(20);
-
-            int Width(int n)
-            {
-                var w = 0;
-                for (var i = 0; i < n; i++)
-                {
-                    var p = parts[i];
-                    w += TextRenderer.MeasureText(g, p.label, Theme.Small, Size.Empty, flags).Width + gap
-                         + TextRenderer.MeasureText(g, p.value, ValueFont(p.pct), Size.Empty, flags).Width
-                         + (p.tail != null ? gap + TextRenderer.MeasureText(g, p.tail, Theme.Small, Size.Empty, flags).Width : 0);
-                    if (i > 0) w += sepW;
-                }
-                return w;
-            }
-
-            var count = parts.Count;
-            while (count > 0 && Width(count) > maxX - minX)
-                count--;
-            if (count == 0)
-                return;
-            var x = maxX - Width(count);
-            var y = (h - TextRenderer.MeasureText(g, "C", Theme.Small, Size.Empty, flags).Height) / 2;
-            for (var i = 0; i < count; i++)
-            {
-                var p = parts[i];
-                if (i > 0)
-                {
-                    TextRenderer.DrawText(g, sep, Theme.Small, new Point(x + Theme.Scale(10), y), Theme.Faint, flags);
-                    x += sepW;
-                }
-                TextRenderer.DrawText(g, p.label, Theme.Small, new Point(x, y), Theme.SubText, flags);
-                x += TextRenderer.MeasureText(g, p.label, Theme.Small, Size.Empty, flags).Width + gap;
-                var color = p.pct >= 90 ? Theme.Danger : p.pct >= 80 ? Theme.Warning : Theme.Ink;
-                TextRenderer.DrawText(g, p.value, ValueFont(p.pct), new Point(x, y), color, flags);
-                x += TextRenderer.MeasureText(g, p.value, ValueFont(p.pct), Size.Empty, flags).Width;
-                if (p.tail != null)
-                {
-                    x += gap;
-                    TextRenderer.DrawText(g, p.tail, Theme.Small, new Point(x, y), Theme.Faint, flags);
-                    x += TextRenderer.MeasureText(g, p.tail, Theme.Small, Size.Empty, flags).Width;
-                }
-            }
-        }
-
-        private static readonly Font SmallBold = new Font(Theme.Small, FontStyle.Bold);
-
-        /// <summary>80% 이상이면 굵게</summary>
-        private static Font ValueFont(double? pct) => pct >= 80 ? SmallBold : Theme.Small;
-
-        /// <summary>"1.2/3.8 GB" — 단위는 전체 크기 기준으로 하나만</summary>
-        private static string FormatPair(long used, long total)
-        {
-            const double GB = 1024.0 * 1024 * 1024, MB = 1024.0 * 1024;
-            if (total >= GB)
-            {
-                var fmt = total >= 100 * GB ? "0" : "0.#";
-                return $"{(used / GB).ToString(fmt)}/{(total / GB).ToString(fmt)} GB";
-            }
-            return $"{used / MB:0}/{total / MB:0} MB";
-        }
-
-        /// <summary>선택된 연결 세션의 서버 자원을 작업 스레드에서 조회 (5초마다). 연결 안 됐거나 선택 안 된 탭은 조회하지 않는다.</summary>
-        private void PollStats()
-        {
-            var v = _tabs.Selected;
-            if (v == null || v.State != SessionState.Connected || v.StatsPolling)
-                return;
-            var probe = v.Probe;
-            if (probe == null)
-                return;
-            v.StatsPolling = true;
-            Task.Run(() =>
-            {
-                try
-                {
-                    lock (v.ProbeLock)
-                        return probe.QueryStats();
-                }
-                catch (Exception)
-                {
-                    return null;
-                }
-            }).ContinueWith(t =>
-            {
-                v.StatsPolling = false;
-                if (IsDisposed || v.IsDisposed || v.State != SessionState.Connected || v.Probe != probe)
-                    return;
-                var first = v.Stats == null;
-                if (t.Result != null)
-                    v.Stats = t.Result;
-                if (v == _tabs.Selected)
-                {
-                    _status.Invalidate();
-                    // CPU 는 두 번 조회한 차이로 구하므로 첫 조회 직후 한 번 더 빨리 묻는다
-                    if (first && t.Result != null && !t.Result.CpuPercent.HasValue)
-                    {
-                        var once = new Timer { Interval = 1500 };
-                        once.Tick += (s, e) => { once.Dispose(); PollStats(); };
-                        once.Start();
-                    }
-                }
-            }, TaskScheduler.FromCurrentSynchronizationContext());
-        }
-
-        private void UpdateStatsPolling()
-        {
-            var on = _tabs.Selected?.State == SessionState.Connected;
-            if (on && !_statsTimer.Enabled)
-            {
-                _statsTimer.Start();
-                PollStats();
-            }
-            else if (!on)
-            {
-                _statsTimer.Stop();
             }
         }
 
@@ -657,7 +530,10 @@ namespace Lish.Ui
 
         private void Open(HostProfile profile)
         {
-            var view = new SessionView(profile, _store, _settings) { Dock = DockStyle.Fill, Visible = false };
+            var view = new SessionView(profile, _settings) { Visible = false };
+            view.Bounds = _content.ClientRectangle;
+            // 분할 중 다른 칸을 클릭하면 그 칸이 활성
+            view.Enter += (s, e) => { if (ShowingSplit && view != _tabs.Selected && (view == _left || view == _right)) _tabs.Select(view); };
             view.StateChanged += (s, e) =>
             {
                 _tabs.Invalidate();
@@ -665,7 +541,6 @@ namespace Lish.Ui
                 {
                     _status.Invalidate();
                     _sftpPage.ShowFor(view);   // 연결/끊김에 따라 SFTP 자동 열기 ↔ 빈 화면
-                    UpdateStatsPolling();
                 }
             };
             view.Term.TerminalResized += (c, r) => { if (view == _tabs.Selected) _status.Invalidate(); };
@@ -677,10 +552,12 @@ namespace Lish.Ui
         private void ShowSelected()
         {
             var sel = _tabs.Selected;
+            var split = ShowingSplit;
             foreach (Control c in _content.Controls)
                 if (c is SessionView v)
-                    v.Visible = v == sel;
+                    v.Visible = split ? v == _left || v == _right : v == sel;
             _empty.Visible = sel == null;
+            LayoutPanes();
             if (sel != null)
             {
                 sel.BringToFront();
@@ -692,20 +569,120 @@ namespace Lish.Ui
                 Text = "LISH";
             }
             _sftpPage.ShowFor(sel);
-            UpdateStatsPolling();
-            if (sel != null && sel.State == SessionState.Connected)
-                PollStats();
             _status.Invalidate();
         }
 
         private void CloseTab(SessionView view)
         {
             if (view == null) return;
+            // 그룹의 탭을 닫으면 그룹이 풀린다. 분할 화면을 보던 중이면 남은 칸만 보인다.
+            SessionView remaining = null;
+            if (Split && (view == _left || view == _right))
+            {
+                if (ShowingSplit)
+                    remaining = view == _left ? _right : _left;
+                _left = _right = null;
+            }
             _tabs.Remove(view);
             _content.Controls.Remove(view);
             view.Disconnect();
             view.Dispose();
+            if (remaining != null && _tabs.Selected != remaining)
+                _tabs.Select(remaining);
+            else
+                ShowSelected();
+        }
+
+        // ───────────── 좌우 분할 ─────────────
+
+        /// <summary>
+        /// view 를 오른쪽 칸, 지금 선택된 탭(view 자신이면 이웃 탭)을 왼쪽 칸으로 하는 그룹을 만든다.
+        /// 그룹은 하나만 — 이미 있으면 새 그룹으로 바뀐다.
+        /// </summary>
+        private void SplitWith(SessionView view)
+        {
+            var left = _tabs.Selected != view ? _tabs.Selected : _tabs.Tabs.FirstOrDefault(t => t != view);
+            if (view == null || left == null)
+                return;
+            _left = left;
+            _right = view;
+            _tabs.SetGroup(_left, _right);
+            if (_tabs.Selected == view)
+                ShowSelected();
+            else
+                _tabs.Select(view);
+        }
+
+        private void Unsplit()
+        {
+            if (!Split) return;
+            _left = _right = null;
+            _tabs.SetGroup(null, null);
             ShowSelected();
+        }
+
+        /// <summary>분할이면 두 칸과 경계선, 아니면 선택 탭이 내용 영역 전체</summary>
+        private void LayoutPanes()
+        {
+            var r = _content.ClientRectangle;
+            if (!ShowingSplit)
+            {
+                _splitBar.Visible = false;
+                foreach (Control c in _content.Controls)
+                    if (c is SessionView v)
+                        v.Bounds = r;
+            }
+            else
+            {
+                var bar = _splitBar.Width;
+                var min = Theme.Scale(160);
+                var lw = Math.Max(min, Math.Min(r.Width - bar - min, (int)((r.Width - bar) * _splitRatio)));
+                var inset = PaneGap + PaneBorder;
+                _left.Bounds = Rectangle.Inflate(new Rectangle(0, 0, lw, r.Height), -inset, -inset);
+                _right.Bounds = Rectangle.Inflate(new Rectangle(lw + bar, 0, r.Width - lw - bar, r.Height), -inset, -inset);
+                _splitBar.Bounds = new Rectangle(lw, 0, bar, r.Height);
+                _splitBar.Visible = true;
+                _splitBar.BringToFront();
+            }
+            _content.Invalidate();
+        }
+
+        /// <summary>분할 중 활성 칸에 보라색 테두리</summary>
+        private void PaintPaneBorder(object sender, PaintEventArgs e)
+        {
+            if (!ShowingSplit)
+                return;
+            // 펜 대신 네 변을 채워 그린다 (펜 두께·정렬에 따라 한 픽셀씩 밀려 칸에 덮이던 문제)
+            var v = _tabs.Selected.Bounds;
+            var b = PaneBorder;
+            using (var brush = new SolidBrush(Theme.Primary))
+            {
+                e.Graphics.FillRectangle(brush, v.X - b, v.Y - b, v.Width + 2 * b, b);   // 위
+                e.Graphics.FillRectangle(brush, v.X - b, v.Bottom, v.Width + 2 * b, b);  // 아래
+                e.Graphics.FillRectangle(brush, v.X - b, v.Y, b, v.Height);              // 왼쪽
+                e.Graphics.FillRectangle(brush, v.Right, v.Y, b, v.Height);              // 오른쪽
+            }
+        }
+
+        /// <summary>두 칸 사이 경계선. 끌어서 폭 조절, 두 번 클릭하면 반반.</summary>
+        private Panel BuildSplitBar()
+        {
+            var bar = new Panel { Width = Theme.Scale(6), Cursor = Cursors.VSplit, BackColor = Color.FromArgb(0x2A, 0x26, 0x44), Visible = false };
+            var dragging = false;
+            bar.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) dragging = true; };
+            bar.MouseUp += (s, e) => dragging = false;
+            bar.MouseMove += (s, e) =>
+            {
+                if (!dragging) return;
+                var x = bar.Left + e.X - bar.Width / 2;
+                var w = _content.ClientSize.Width - bar.Width;
+                if (w <= 0) return;
+                _splitRatio = Math.Max(0.15, Math.Min(0.85, x / (double)w));
+                LayoutPanes();
+                _content.Update();
+            };
+            bar.DoubleClick += (s, e) => { _splitRatio = 0.5; LayoutPanes(); };
+            return bar;
         }
 
         /// <summary>Ctrl+Shift+F: 사이드바 세션 ↔ SFTP 탭</summary>
@@ -722,6 +699,11 @@ namespace Lish.Ui
             m.Add("다시 접속", Theme.IconRefresh, () => view.Connect()).Enabled = view.State == SessionState.Disconnected;
             m.Add("탭 복제", Theme.IconNewWindow, () => Open(view.Profile.Clone()), "Ctrl+Shift+T");
             m.Add("SFTP 열기 (사이드바)", Theme.IconFolder, () => SetSidebarPage(true), "Ctrl+Shift+F").Enabled = !_sidebarSftp;
+            m.AddSeparator();
+            if (Split && (view == _left || view == _right))
+                m.Add("분할 해제 (그룹 풀기)", Theme.IconUnsplit, Unsplit);
+            else
+                m.Add("오른쪽에 분할로 보기", Theme.IconSplit, () => SplitWith(view)).Enabled = _tabs.Tabs.Count >= 2;
             if (string.IsNullOrEmpty(view.Profile.Name) || _store.Find(view.Profile.Name) == null)
                 m.Add("세션으로 저장...", Theme.IconSave, () =>
                 {
@@ -811,6 +793,10 @@ namespace Lish.Ui
                     return false;
                 case "follow": _sftpPage.FollowTerminal = arg == "on"; return true;
                 case "close": CloseTab(_tabs.Selected); return true;
+                case "split":
+                    if (arg == "off") { Unsplit(); return true; }
+                    if (int.TryParse(arg, out var si) && si >= 0 && si < _tabs.Tabs.Count) { SplitWith(_tabs.Tabs[si]); return true; }
+                    return false;
                 case "type": _tabs.Selected?.TestType(arg.Replace("\\r", "\r")); return _tabs.Selected != null;
                 case "drag": panel?.SetDropHighlight(arg == "on"); return panel != null;
                 case "drop": panel?.DropFiles(arg.Split('|')); return panel != null;
@@ -840,7 +826,6 @@ namespace Lish.Ui
             _settings.WindowWidth = b.Width;
             _settings.WindowHeight = b.Height;
             RememberSidebarWidth();
-            _statsTimer.Stop();
             _settings.Save();
 
             foreach (var t in _tabs.Tabs.ToList())

@@ -74,6 +74,8 @@ namespace Lish.Terminal
         /// <summary>터미널이 원격으로 돌려보내야 하는 응답 (DA, CPR 등)</summary>
         public event Action<string> Response;
         public event Action<string> TitleChanged;
+        /// <summary>셸이 OSC 7 로 알린 현재 폴더 (호스트, 경로)</summary>
+        public event Action<string, string> CwdChanged;
         public event Action Bell;
 
         public VtTerminal(int cols, int rows, int maxScrollback)
