@@ -8,6 +8,11 @@
 
 ## [Unreleased]
 
+### Added
+- 단위 테스트(xUnit, `tests/Lish.Tests`, 129개): VT 파서 · OSC 7 · 문자 폭 · known_hosts · 주소 파싱 · 세션 폴더 · 세션 저장소(예전 비밀번호 삭제 마이그레이션) · 설정.
+  PR 빌드 검사에서 함께 실행된다.
+- `CONTRIBUTING.md`: 기여 절차, 커밋 규칙, 코드 요구 사항, 테스트 정책.
+
 ## [0.0.6] - 2026-11-01
 
 ### Security

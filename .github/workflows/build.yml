@@ -25,6 +25,19 @@ jobs:
         shell: pwsh
         run: ./build.ps1
 
+      # 단위 테스트 (tests/Lish.Tests, xUnit). 하나라도 실패하면 build 검사가 실패한다.
+      - name: Test
+        shell: pwsh
+        run: dotnet test tests/Lish.Tests -c Release --nologo --logger "trx;LogFileName=lish-tests.trx" --logger "console;verbosity=normal" --results-directory TestResults
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-${{ github.sha }}
+          path: TestResults/*.trx
+          retention-days: 14
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lish-${{ github.sha }}
