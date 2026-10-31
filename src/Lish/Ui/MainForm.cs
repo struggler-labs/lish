@@ -26,12 +26,14 @@ namespace Lish.Ui
         private readonly SftpSidebar _sftpPage;
         private bool _sidebarSftp;
 
-        // 좌우 2분할: 두 칸 모두 탭 바에 있는 탭이고, 활성 칸의 탭이 _tabs.Selected 다.
+        // 좌우 2분할 그룹: 두 탭을 탭 바에서 한 묶음으로 보이고, 그룹의 탭을 고르면 두 칸을 나란히 보인다.
+        // 활성 칸의 탭이 _tabs.Selected 다. 그룹 밖의 탭을 고르면 그 탭만 보이고 그룹은 남는다.
         private readonly Panel _splitBar;
-        private SessionView _left, _right;   // 분할 중일 때만 (아니면 null)
+        private SessionView _left, _right;   // 그룹이 있을 때만 (아니면 null)
         private double _splitRatio = 0.5;
         private bool Split => _left != null && _right != null;
-        private SessionView _lastSelected;
+        /// <summary>지금 분할 화면을 보이는 중인지 (그룹의 탭이 선택됨)</summary>
+        private bool ShowingSplit => Split && (_tabs.Selected == _left || _tabs.Selected == _right);
         private static int PaneBorder => Theme.Scale(2);
 
         /// <summary>SFTP 탭일 때 사이드바 최소/기본 폭 (아이콘 도구 모음 + 이름/크기 열이 들어가는 폭)</summary>
@@ -529,7 +531,7 @@ namespace Lish.Ui
             var view = new SessionView(profile, _store, _settings) { Visible = false };
             view.Bounds = _content.ClientRectangle;
             // 분할 중 다른 칸을 클릭하면 그 칸이 활성
-            view.Enter += (s, e) => { if (Split && view != _tabs.Selected && (view == _left || view == _right)) _tabs.Select(view); };
+            view.Enter += (s, e) => { if (ShowingSplit && view != _tabs.Selected && (view == _left || view == _right)) _tabs.Select(view); };
             view.StateChanged += (s, e) =>
             {
                 _tabs.Invalidate();
@@ -548,22 +550,10 @@ namespace Lish.Ui
         private void ShowSelected()
         {
             var sel = _tabs.Selected;
-            if (Split)
-            {
-                if (sel == null)
-                    _left = _right = null;
-                else if (sel != _left && sel != _right)
-                {
-                    // 탭 바에서 고른 탭은 활성 칸에 표시 (활성 칸 = 직전 선택 탭이 있던 칸)
-                    if (_lastSelected == _left) _left = sel;
-                    else _right = sel;
-                }
-            }
-            _lastSelected = sel;
-            _tabs.Companion = !Split ? null : sel == _left ? _right : _left;
+            var split = ShowingSplit;
             foreach (Control c in _content.Controls)
                 if (c is SessionView v)
-                    v.Visible = Split ? v == _left || v == _right : v == sel;
+                    v.Visible = split ? v == _left || v == _right : v == sel;
             _empty.Visible = sel == null;
             LayoutPanes();
             if (sel != null)
@@ -583,17 +573,16 @@ namespace Lish.Ui
         private void CloseTab(SessionView view)
         {
             if (view == null) return;
-            // 분할 칸의 탭을 닫으면 남은 칸만 보인다
+            // 그룹의 탭을 닫으면 그룹이 풀린다. 분할 화면을 보던 중이면 남은 칸만 보인다.
             SessionView remaining = null;
             if (Split && (view == _left || view == _right))
             {
-                remaining = view == _left ? _right : _left;
+                if (ShowingSplit)
+                    remaining = view == _left ? _right : _left;
                 _left = _right = null;
             }
             _tabs.Remove(view);
             _content.Controls.Remove(view);
-            if (_lastSelected == view)
-                _lastSelected = null;
             view.Disconnect();
             view.Dispose();
             if (remaining != null && _tabs.Selected != remaining)
@@ -604,7 +593,10 @@ namespace Lish.Ui
 
         // ───────────── 좌우 분할 ─────────────
 
-        /// <summary>view 를 오른쪽 칸에, 지금 선택된 탭(view 자신이면 이웃 탭)을 왼쪽 칸에 놓는다.</summary>
+        /// <summary>
+        /// view 를 오른쪽 칸, 지금 선택된 탭(view 자신이면 이웃 탭)을 왼쪽 칸으로 하는 그룹을 만든다.
+        /// 그룹은 하나만 — 이미 있으면 새 그룹으로 바뀐다.
+        /// </summary>
         private void SplitWith(SessionView view)
         {
             var left = _tabs.Selected != view ? _tabs.Selected : _tabs.Tabs.FirstOrDefault(t => t != view);
@@ -612,7 +604,7 @@ namespace Lish.Ui
                 return;
             _left = left;
             _right = view;
-            _lastSelected = view;
+            _tabs.SetGroup(_left, _right);
             if (_tabs.Selected == view)
                 ShowSelected();
             else
@@ -623,6 +615,7 @@ namespace Lish.Ui
         {
             if (!Split) return;
             _left = _right = null;
+            _tabs.SetGroup(null, null);
             ShowSelected();
         }
 
@@ -630,7 +623,7 @@ namespace Lish.Ui
         private void LayoutPanes()
         {
             var r = _content.ClientRectangle;
-            if (!Split)
+            if (!ShowingSplit)
             {
                 _splitBar.Visible = false;
                 foreach (Control c in _content.Controls)
@@ -655,9 +648,9 @@ namespace Lish.Ui
         /// <summary>분할 중 활성 칸에 보라색 테두리</summary>
         private void PaintPaneBorder(object sender, PaintEventArgs e)
         {
-            var sel = _tabs.Selected;
-            if (!Split || (sel != _left && sel != _right))
+            if (!ShowingSplit)
                 return;
+            var sel = _tabs.Selected;
             var b = PaneBorder;
             var r = Rectangle.Inflate(sel.Bounds, b, b);
             using (var pen = new Pen(Theme.Primary, b) { Alignment = System.Drawing.Drawing2D.PenAlignment.Inset })
@@ -701,7 +694,7 @@ namespace Lish.Ui
             m.Add("SFTP 열기 (사이드바)", Theme.IconFolder, () => SetSidebarPage(true), "Ctrl+Shift+F").Enabled = !_sidebarSftp;
             m.AddSeparator();
             if (Split && (view == _left || view == _right))
-                m.Add("분할 해제", Theme.IconUnsplit, Unsplit);
+                m.Add("분할 해제 (그룹 풀기)", Theme.IconUnsplit, Unsplit);
             else
                 m.Add("오른쪽에 분할로 보기", Theme.IconSplit, () => SplitWith(view)).Enabled = _tabs.Tabs.Count >= 2;
             if (string.IsNullOrEmpty(view.Profile.Name) || _store.Find(view.Profile.Name) == null)
