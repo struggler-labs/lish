@@ -204,10 +204,10 @@ namespace Lish.Core
             }
 
             _keys = LoadKeys(p);
-            _password = Secret.Unprotect(p.SavedPassword);
             const int maxPasswordPrompts = 3;
             var passwordPrompts = 0;
 
+            // 비밀번호는 저장하지 않는다. 처음엔 키/keyboard-interactive 로 시도하고, 인증 실패 시 묻는다.
             // 키 인증이 한 번 실패하면 이후 재접속에서는 키를 빼고 비밀번호만 시도한다.
             // (SSH.NET 은 RSA 키를 서명 알고리즘별로 여러 번 시도하므로 서버 MaxAuthTries 를 빨리 소진한다)
             var useKeys = _keys.Count > 0;
@@ -316,7 +316,7 @@ namespace Lish.Core
                     }
                     else
                     {
-                        // OTP 등 서버가 요구하는 추가 입력. 저장된 비밀번호 없이 PAM 이 "Password:" 를 물으면 비밀번호 창으로 보인다.
+                        // OTP 등 서버가 요구하는 추가 입력. 앞서 입력한 비밀번호 없이 PAM 이 "Password:" 를 물으면 비밀번호 창으로 보인다.
                         var message = string.IsNullOrEmpty(e.Instruction) ? prompt.Request : e.Instruction + "\n" + prompt.Request;
                         prompt.Response = _ui.Prompt(isPassword ? "비밀번호" : "추가 인증", message.Trim(), !prompt.IsEchoed) ?? "";
                     }

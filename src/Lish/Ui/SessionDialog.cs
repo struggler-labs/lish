@@ -16,10 +16,9 @@ namespace Lish.Ui
         private readonly ExpanderHeader _advToggle;
         private TableLayoutPanel _target;   // Section/Field/Hint 가 행을 넣을 그리드
 
-        private readonly InputBox _name, _host, _port, _user, _password, _key, _proxy, _term, _keepAlive, _forwards, _socks, _note;
+        private readonly InputBox _name, _host, _port, _user, _key, _proxy, _term, _keepAlive, _forwards, _socks, _note;
         private readonly ComboField _group, _jump, _encoding;
         private readonly List<string> _folders;   // _group 항목 순서대로 (0 = 최상위 null)
-        private readonly Toggle _savePassword;
         private readonly Label _error;
 
         public HostProfile Result { get; private set; }
@@ -83,8 +82,7 @@ namespace Lish.Ui
             _user = Field("사용자", new InputBox("로그인 계정"));
 
             Section("인증");
-            _password = Field("비밀번호", new InputBox(string.IsNullOrEmpty(p.SavedPassword) ? "접속 시 입력 (선택)" : "저장됨 · 변경하려면 입력", Theme.IconLock, true));
-            _savePassword = Field("", new Toggle("비밀번호 저장 (Windows DPAPI 암호화)") { Checked = !string.IsNullOrEmpty(p.SavedPassword) });
+            // 비밀번호는 보안상 저장하지 않는다 (접속할 때마다 입력)
             var keyRow = new Panel { Height = Theme.Scale(32), BackColor = Color.White };
             _key = new InputBox("개인키 파일 (미지정 시 ~/.ssh/id_* 자동)", Theme.IconKey) { Dock = DockStyle.Fill };
             var browse = new FlatButton("찾아보기", ButtonKind.Secondary) { Dock = DockStyle.Right };
@@ -338,11 +336,6 @@ namespace Lish.Ui
             }
             if (p.LocalForwardList.Count == 0) p.LocalForwards = null;
             if (p.DynamicForwardList.Count == 0) p.DynamicForwards = null;
-
-            if (!_savePassword.Checked)
-                p.SavedPassword = null;
-            else if (_password.Text.Length > 0)
-                p.SavedPassword = Secret.Protect(_password.Text);
 
             if (_original != null && !string.Equals(_original.Name, p.Name, StringComparison.OrdinalIgnoreCase))
                 _store.Remove(_original.Name);

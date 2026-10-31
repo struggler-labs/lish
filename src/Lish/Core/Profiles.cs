@@ -28,8 +28,11 @@ namespace Lish.Core
         [DataMember(Order = 11, EmitDefaultValue = false)] public string Term { get; set; }
         [DataMember(Order = 12)] public int KeepAlive { get; set; } = 30;
         [DataMember(Order = 13)] public int Timeout { get; set; } = 15;
-        /// <summary>DPAPI(현재 사용자)로 암호화된 비밀번호.</summary>
-        [DataMember(Order = 14, EmitDefaultValue = false)] public string SavedPassword { get; set; }
+        /// <summary>
+        /// 예전 버전의 "비밀번호 저장"(DPAPI 암호문). 보안상 기능을 없앴고, 기존 파일에서 읽기만 해서
+        /// ProfileStore.Load 가 지우고 다시 저장한다. 앱 코드에서는 쓰지 않는다.
+        /// </summary>
+        [DataMember(Name = "SavedPassword", Order = 14, EmitDefaultValue = false)] private string LegacySavedPassword { get; set; }
         [DataMember(Order = 15, EmitDefaultValue = false)] public string Note { get; set; }
 
         public List<string> LocalForwardList => LocalForwards ?? (LocalForwards = new List<string>());
@@ -65,7 +68,17 @@ namespace Lish.Core
             var c = (HostProfile)MemberwiseClone();
             c.LocalForwards = LocalForwards == null ? null : new List<string>(LocalForwards);
             c.DynamicForwards = DynamicForwards == null ? null : new List<string>(DynamicForwards);
+            c.LegacySavedPassword = null;
             return c;
+        }
+
+        /// <summary>예전 버전이 저장한 비밀번호가 남아 있으면 지운다. 지웠으면 true.</summary>
+        public bool ClearLegacyPassword()
+        {
+            if (LegacySavedPassword == null)
+                return false;
+            LegacySavedPassword = null;
+            return true;
         }
 
         [OnDeserializing]
@@ -242,6 +255,10 @@ namespace Lish.Core
                 LoadError = $"세션 파일을 읽을 수 없어 백업했습니다.\n{backup}\n\n{ex.Message}";
                 list = new List<HostProfile>();
             }
+            // 예전 버전의 "비밀번호 저장" 값은 디스크에서 지운다 (이름 없는 항목도 버려지기 전에 확인)
+            var hadLegacyPassword = false;
+            foreach (var p in list.Where(p => p != null))
+                hadLegacyPassword |= p.ClearLegacyPassword();
             var store = new ProfileStore(list.Where(p => p != null && !string.IsNullOrEmpty(p.Name)).ToList());
             foreach (var p in store._profiles)
             {
@@ -258,6 +275,17 @@ namespace Lish.Core
                 // 폴더 목록이 깨져도 세션의 폴더는 남으므로 빈 폴더만 잃는다.
             }
             store.Sort();
+            if (hadLegacyPassword)
+            {
+                try
+                {
+                    store.Save();
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    // 지금 못 지우면 다음 실행(또는 다음 저장)에서 다시 지운다.
+                }
+            }
             return store;
         }
 
@@ -403,6 +431,8 @@ namespace Lish.Core
         [DataMember] public int SftpSidebarWidth { get; set; }
         /// <summary>SFTP 탭 "터미널 폴더 따라가기"</summary>
         [DataMember] public bool SftpFollowTerminal { get; set; } = true;
+        /// <summary>세션 탭을 터미널 왼쪽에 세로 목록으로 표시</summary>
+        [DataMember] public bool VerticalTabs { get; set; }
 
         [OnDeserializing]
         private void OnDeserializing(StreamingContext _)

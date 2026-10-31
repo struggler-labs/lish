@@ -10,7 +10,7 @@
     <AssemblyName>lish</AssemblyName>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <Version>0.0.4</Version>
+    <Version>0.0.5</Version>
     <Product>LISH - Lightweight SSH</Product>
     <Description>Lightweight SSH &amp; SFTP Client for Windows</Description>
     <Company>LISH</Company>
@@ -31,7 +31,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="System.Security" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Runtime.Serialization" />

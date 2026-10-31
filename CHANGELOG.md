@@ -8,6 +8,26 @@
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-10-31
+
+### Security
+- **서버에서 자동으로 명령을 실행하지 않음**: 원격 모니터(5초마다 `/proc/stat`·`/proc/meminfo`·`df` 조회)와
+  exec 채널 방식의 셸 폴더 조회(2초마다 `/proc` 전체 순회)를 없앴다. 사용자가 입력하지 않은 명령이 서버 감사 로그에 남지 않는다.
+- **비밀번호 저장 기능 삭제**: 세션 편집에서 비밀번호 입력란과 저장 스위치를 없앴다. 예전 버전이 `hosts.json` 에 저장한
+  비밀번호(DPAPI 암호문)는 시작할 때 지우고 파일을 다시 저장한다.
+
+### Added
+- **세로 탭**: 세션 탭을 사이드바와 터미널 사이에 세로 목록으로 표시. 설정 "세션 탭을 왼쪽에 세로로 보기" 또는
+  탭 우클릭 메뉴 "탭 세로로 보기 / 탭 가로로 보기"로 바로 전환. 탭이 많으면 휠로 스크롤하고 선택한 탭이 보이게 자동 스크롤.
+
+### Changed
+- **터미널 폴더 따라가기**: 셸이 프롬프트마다 보내는 OSC 7(`file://호스트/경로`)로 현재 폴더를 알아낸다. 셸 설정이 필요하다
+  (bash: `PROMPT_COMMAND='printf "\e]7;file://%s%s\a" "$HOSTNAME" "$PWD"'`). 처음 알린 호스트와 다른 호스트(터미널 안에서 다시 ssh 한 서버)는 무시한다.
+  SFTP 를 처음 열 때도 이 값을 쓰고, 모르면 홈 폴더에서 연다.
+
+### Removed
+- 하단 상태바의 원격 모니터(CPU · RAM · Disk).
+
 ## [0.0.4] - 2026-10-26
 
 ### Added
@@ -51,7 +71,8 @@ Windows 10/11용 WinForms GUI 클라이언트 첫 공개 버전입니다.
 - SSH.NET 2026.0.0 사용 (2025.0.0 의 GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284 회피).
 - 호스트 키 확인 창의 Enter 기본값은 '취소' — 키 신뢰는 버튼을 직접 눌러야 합니다.
 
-[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/struggler-labs/lish/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/struggler-labs/lish/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/struggler-labs/lish/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/struggler-labs/lish/releases/tag/v0.0.2

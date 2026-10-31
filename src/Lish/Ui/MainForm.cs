@@ -24,7 +24,6 @@ namespace Lish.Ui
         private readonly SegmentedTabs _sideTabs;
         private readonly Panel _sessionsPage;
         private readonly SftpSidebar _sftpPage;
-        private readonly Timer _statsTimer;
         private bool _sidebarSftp;
 
         /// <summary>SFTP 탭일 때 사이드바 최소/기본 폭 (아이콘 도구 모음 + 이름/크기 열이 들어가는 폭)</summary>
@@ -105,7 +104,7 @@ namespace Lish.Ui
             splitter.SplitterMoved += (s, e) => RememberSidebarWidth();
 
             // ── 탭 + 내용 ──
-            _tabs = new TabStrip { Dock = DockStyle.Top };
+            _tabs = new TabStrip { Vertical = _settings.VerticalTabs };
             _tabs.SelectedChanged += (s, e) => ShowSelected();
             _tabs.CloseRequested += CloseTab;
             _tabs.AddRequested += (s, e) => QuickConnect();
@@ -124,8 +123,6 @@ namespace Lish.Ui
             // ── 상태바 ──
             _status = new Panel { Dock = DockStyle.Bottom, Height = Theme.Scale(28), BackColor = Color.White };
             _status.Paint += PaintStatus;
-            _statsTimer = new Timer { Interval = 5000 };
-            _statsTimer.Tick += (s, e) => PollStats();
 
             Controls.Add(main);
             Controls.Add(splitter);
@@ -248,157 +245,17 @@ namespace Lish.Ui
                     g.FillEllipse(b, x, (h - ds) / 2f, ds, ds);
                 x += Theme.Scale(14);
                 var text = $"{stateText}  ·  {v.Profile.Display()}";
-                var leftW = TextRenderer.MeasureText(g, text, Theme.Small).Width;
                 TextRenderer.DrawText(g, text, Theme.Small, new Point(x, (h - Theme.Small.Height) / 2), Theme.Ink);
 
                 var right = $"{(string.IsNullOrEmpty(v.Profile.Encoding) ? "UTF-8" : v.Profile.Encoding.ToUpperInvariant())}   ·   {v.Term.Columns}×{v.Term.RowsCount}   ·   {v.Profile.TermOrDefault}";
                 var sz = TextRenderer.MeasureText(g, right, Theme.Small);
                 var rightX = _status.Width - sz.Width - Theme.Scale(14);
                 TextRenderer.DrawText(g, right, Theme.Small, new Point(rightX, (h - Theme.Small.Height) / 2), Theme.SubText);
-
-                if (v.State == SessionState.Connected && v.Stats != null)
-                    PaintStats(g, v.Stats, x + leftW + Theme.Scale(24), rightX - Theme.Scale(12), h);
             }
             else
             {
                 TextRenderer.DrawText(g, $"LISH {Program.Version}  ·  세션 {_store.All.Count}개  ·  {Paths.DataDir}", Theme.Small,
                     new Point(x, (h - Theme.Small.Height) / 2), Theme.SubText);
-            }
-        }
-
-        /// <summary>
-        /// 원격 서버 자원: "CPU 12%  ·  RAM 1.2/3.8 GB  ·  Disk 18/50 GB (/)" 를 오른쪽 정보 왼쪽에 오른쪽 맞춤으로 그린다.
-        /// 값은 사용률에 따라 색 (80% 이상 Warning, 90% 이상 Danger). 자리가 모자라면 Disk → RAM → CPU 순으로 뺀다.
-        /// </summary>
-        private void PaintStats(Graphics g, RemoteStats st, int minX, int maxX, int h)
-        {
-            var parts = new System.Collections.Generic.List<(string label, string value, double? pct, string tail)>();
-            if (st.CpuPercent.HasValue)
-                parts.Add(("CPU", $"{st.CpuPercent.Value:0}%", st.CpuPercent, null));
-            if (st.MemTotal > 0 && st.MemUsed.HasValue)
-                parts.Add(("RAM", FormatPair(st.MemUsed.Value, st.MemTotal.Value), st.MemUsed.Value * 100.0 / st.MemTotal.Value, null));
-            if (st.DiskTotal > 0 && st.DiskUsed.HasValue)
-                parts.Add(("Disk", FormatPair(st.DiskUsed.Value, st.DiskTotal.Value), st.DiskUsed.Value * 100.0 / st.DiskTotal.Value,
-                    string.IsNullOrEmpty(st.DiskMount) ? null : $"({st.DiskMount})"));
-            const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
-            var gap = Theme.Scale(4);
-            var sep = "·";
-            var sepW = TextRenderer.MeasureText(g, sep, Theme.Small, Size.Empty, flags).Width + Theme.Scale(20);
-
-            int Width(int n)
-            {
-                var w = 0;
-                for (var i = 0; i < n; i++)
-                {
-                    var p = parts[i];
-                    w += TextRenderer.MeasureText(g, p.label, Theme.Small, Size.Empty, flags).Width + gap
-                         + TextRenderer.MeasureText(g, p.value, ValueFont(p.pct), Size.Empty, flags).Width
-                         + (p.tail != null ? gap + TextRenderer.MeasureText(g, p.tail, Theme.Small, Size.Empty, flags).Width : 0);
-                    if (i > 0) w += sepW;
-                }
-                return w;
-            }
-
-            var count = parts.Count;
-            while (count > 0 && Width(count) > maxX - minX)
-                count--;
-            if (count == 0)
-                return;
-            var x = maxX - Width(count);
-            var y = (h - TextRenderer.MeasureText(g, "C", Theme.Small, Size.Empty, flags).Height) / 2;
-            for (var i = 0; i < count; i++)
-            {
-                var p = parts[i];
-                if (i > 0)
-                {
-                    TextRenderer.DrawText(g, sep, Theme.Small, new Point(x + Theme.Scale(10), y), Theme.Faint, flags);
-                    x += sepW;
-                }
-                TextRenderer.DrawText(g, p.label, Theme.Small, new Point(x, y), Theme.SubText, flags);
-                x += TextRenderer.MeasureText(g, p.label, Theme.Small, Size.Empty, flags).Width + gap;
-                var color = p.pct >= 90 ? Theme.Danger : p.pct >= 80 ? Theme.Warning : Theme.Ink;
-                TextRenderer.DrawText(g, p.value, ValueFont(p.pct), new Point(x, y), color, flags);
-                x += TextRenderer.MeasureText(g, p.value, ValueFont(p.pct), Size.Empty, flags).Width;
-                if (p.tail != null)
-                {
-                    x += gap;
-                    TextRenderer.DrawText(g, p.tail, Theme.Small, new Point(x, y), Theme.Faint, flags);
-                    x += TextRenderer.MeasureText(g, p.tail, Theme.Small, Size.Empty, flags).Width;
-                }
-            }
-        }
-
-        private static readonly Font SmallBold = new Font(Theme.Small, FontStyle.Bold);
-
-        /// <summary>80% 이상이면 굵게</summary>
-        private static Font ValueFont(double? pct) => pct >= 80 ? SmallBold : Theme.Small;
-
-        /// <summary>"1.2/3.8 GB" — 단위는 전체 크기 기준으로 하나만</summary>
-        private static string FormatPair(long used, long total)
-        {
-            const double GB = 1024.0 * 1024 * 1024, MB = 1024.0 * 1024;
-            if (total >= GB)
-            {
-                var fmt = total >= 100 * GB ? "0" : "0.#";
-                return $"{(used / GB).ToString(fmt)}/{(total / GB).ToString(fmt)} GB";
-            }
-            return $"{used / MB:0}/{total / MB:0} MB";
-        }
-
-        /// <summary>선택된 연결 세션의 서버 자원을 작업 스레드에서 조회 (5초마다). 연결 안 됐거나 선택 안 된 탭은 조회하지 않는다.</summary>
-        private void PollStats()
-        {
-            var v = _tabs.Selected;
-            if (v == null || v.State != SessionState.Connected || v.StatsPolling)
-                return;
-            var probe = v.Probe;
-            if (probe == null)
-                return;
-            v.StatsPolling = true;
-            Task.Run(() =>
-            {
-                try
-                {
-                    lock (v.ProbeLock)
-                        return probe.QueryStats();
-                }
-                catch (Exception)
-                {
-                    return null;
-                }
-            }).ContinueWith(t =>
-            {
-                v.StatsPolling = false;
-                if (IsDisposed || v.IsDisposed || v.State != SessionState.Connected || v.Probe != probe)
-                    return;
-                var first = v.Stats == null;
-                if (t.Result != null)
-                    v.Stats = t.Result;
-                if (v == _tabs.Selected)
-                {
-                    _status.Invalidate();
-                    // CPU 는 두 번 조회한 차이로 구하므로 첫 조회 직후 한 번 더 빨리 묻는다
-                    if (first && t.Result != null && !t.Result.CpuPercent.HasValue)
-                    {
-                        var once = new Timer { Interval = 1500 };
-                        once.Tick += (s, e) => { once.Dispose(); PollStats(); };
-                        once.Start();
-                    }
-                }
-            }, TaskScheduler.FromCurrentSynchronizationContext());
-        }
-
-        private void UpdateStatsPolling()
-        {
-            var on = _tabs.Selected?.State == SessionState.Connected;
-            if (on && !_statsTimer.Enabled)
-            {
-                _statsTimer.Start();
-                PollStats();
-            }
-            else if (!on)
-            {
-                _statsTimer.Stop();
             }
         }
 
@@ -635,7 +492,16 @@ namespace Lish.Ui
                     return;
                 foreach (var v in _tabs.Tabs)
                     v.ApplySettings(_settings);
+                _tabs.Vertical = _settings.VerticalTabs;
             }
+        }
+
+        /// <summary>탭 가로(위) ↔ 세로(왼쪽) 배치 전환. 바로 적용하고 저장.</summary>
+        private void SetVerticalTabs(bool vertical)
+        {
+            _settings.VerticalTabs = vertical;
+            _settings.Save();
+            _tabs.Vertical = vertical;
         }
 
         // ───────────── 탭 ─────────────
@@ -665,7 +531,6 @@ namespace Lish.Ui
                 {
                     _status.Invalidate();
                     _sftpPage.ShowFor(view);   // 연결/끊김에 따라 SFTP 자동 열기 ↔ 빈 화면
-                    UpdateStatsPolling();
                 }
             };
             view.Term.TerminalResized += (c, r) => { if (view == _tabs.Selected) _status.Invalidate(); };
@@ -692,9 +557,6 @@ namespace Lish.Ui
                 Text = "LISH";
             }
             _sftpPage.ShowFor(sel);
-            UpdateStatsPolling();
-            if (sel != null && sel.State == SessionState.Connected)
-                PollStats();
             _status.Invalidate();
         }
 
@@ -719,6 +581,16 @@ namespace Lish.Ui
         private void ShowTabMenu(SessionView view, Point location)
         {
             var m = new FlatMenu();
+            m.Closed += (s, e) => BeginInvoke((Action)m.Dispose);
+            var layoutText = _tabs.Vertical ? "탭 가로로 보기" : "탭 세로로 보기";
+            var layoutIcon = _tabs.Vertical ? Theme.IconDockBottom : Theme.IconDockLeft;
+            if (view == null)
+            {
+                // 탭 밖 빈 곳: 배치 전환만
+                m.Add(layoutText, layoutIcon, () => SetVerticalTabs(!_tabs.Vertical));
+                m.Show(_tabs, location);
+                return;
+            }
             m.Add("다시 접속", Theme.IconRefresh, () => view.Connect()).Enabled = view.State == SessionState.Disconnected;
             m.Add("탭 복제", Theme.IconNewWindow, () => Open(view.Profile.Clone()), "Ctrl+Shift+T");
             m.Add("SFTP 열기 (사이드바)", Theme.IconFolder, () => SetSidebarPage(true), "Ctrl+Shift+F").Enabled = !_sidebarSftp;
@@ -738,7 +610,8 @@ namespace Lish.Ui
                 foreach (var t in _tabs.Tabs.Where(t => t != view).ToList())
                     CloseTab(t);
             });
-            m.Closed += (s, e) => BeginInvoke((Action)m.Dispose);
+            m.AddSeparator();
+            m.Add(layoutText, layoutIcon, () => SetVerticalTabs(!_tabs.Vertical));
             m.Show(_tabs, location);
         }
 
@@ -840,7 +713,6 @@ namespace Lish.Ui
             _settings.WindowWidth = b.Width;
             _settings.WindowHeight = b.Height;
             RememberSidebarWidth();
-            _statsTimer.Stop();
             _settings.Save();
 
             foreach (var t in _tabs.Tabs.ToList())

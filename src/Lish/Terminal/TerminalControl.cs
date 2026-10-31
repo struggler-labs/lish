@@ -55,6 +55,7 @@ namespace Lish.Terminal
         public event Action<string> Input;
         public event Action<int, int> TerminalResized;
         public event Action<string> TitleChanged;
+        public event Action<string, string> CwdChanged;
 
         public VtTerminal Terminal => _term;
         public int Columns => _term.Cols;
@@ -76,6 +77,11 @@ namespace Lish.Terminal
             {
                 if (IsHandleCreated)
                     BeginInvoke((Action)(() => TitleChanged?.Invoke(t)));
+            };
+            _term.CwdChanged += (host, path) =>
+            {
+                if (IsHandleCreated)
+                    BeginInvoke((Action)(() => CwdChanged?.Invoke(host, path)));
             };
 
             CreateFonts();
