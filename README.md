@@ -1,5 +1,7 @@
 # LISH
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/struggler-labs/lish/badge)](https://scorecard.dev/viewer/?uri=github.com/struggler-labs/lish)
+
 **Lightweight SSH & SFTP Client for Windows.**
 
 Windows 10/11용 경량 SSH·SFTP GUI 클라이언트입니다 (C# WinForms, .NET Framework 4.8).
