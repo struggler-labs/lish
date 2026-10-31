@@ -1,0 +1,31 @@
+# Dependabot 설정
+# - NuGet 패키지(src/Lish)와 GitHub Actions 의존성을 매주 월요일 자동 점검한다.
+# - SHA 고정된 액션도 버전 주석(# vX.Y.Z)과 함께 갱신된다.
+# - OpenSSF Scorecard "Dependency-Update-Tool" 항목 충족 목적.
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/src/Lish"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      nuget-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
