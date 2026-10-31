@@ -34,7 +34,9 @@ namespace Lish.Ui
         private bool Split => _left != null && _right != null;
         /// <summary>지금 분할 화면을 보이는 중인지 (그룹의 탭이 선택됨)</summary>
         private bool ShowingSplit => Split && (_tabs.Selected == _left || _tabs.Selected == _right);
+        /// <summary>분할 칸 테두리 두께와 그 바깥 여백 (테두리가 창 가장자리·탭 바·경계선에 붙어 가려지지 않게)</summary>
         private static int PaneBorder => Theme.Scale(2);
+        private static int PaneGap => Theme.Scale(4);
 
         /// <summary>SFTP 탭일 때 사이드바 최소/기본 폭 (아이콘 도구 모음 + 이름/크기 열이 들어가는 폭)</summary>
         private static int SftpMinWidth => Theme.Scale(260);
@@ -635,9 +637,9 @@ namespace Lish.Ui
                 var bar = _splitBar.Width;
                 var min = Theme.Scale(160);
                 var lw = Math.Max(min, Math.Min(r.Width - bar - min, (int)((r.Width - bar) * _splitRatio)));
-                var b = PaneBorder;
-                _left.Bounds = Rectangle.Inflate(new Rectangle(0, 0, lw, r.Height), -b, -b);
-                _right.Bounds = Rectangle.Inflate(new Rectangle(lw + bar, 0, r.Width - lw - bar, r.Height), -b, -b);
+                var inset = PaneGap + PaneBorder;
+                _left.Bounds = Rectangle.Inflate(new Rectangle(0, 0, lw, r.Height), -inset, -inset);
+                _right.Bounds = Rectangle.Inflate(new Rectangle(lw + bar, 0, r.Width - lw - bar, r.Height), -inset, -inset);
                 _splitBar.Bounds = new Rectangle(lw, 0, bar, r.Height);
                 _splitBar.Visible = true;
                 _splitBar.BringToFront();
@@ -650,11 +652,16 @@ namespace Lish.Ui
         {
             if (!ShowingSplit)
                 return;
-            var sel = _tabs.Selected;
+            // 펜 대신 네 변을 채워 그린다 (펜 두께·정렬에 따라 한 픽셀씩 밀려 칸에 덮이던 문제)
+            var v = _tabs.Selected.Bounds;
             var b = PaneBorder;
-            var r = Rectangle.Inflate(sel.Bounds, b, b);
-            using (var pen = new Pen(Theme.Primary, b) { Alignment = System.Drawing.Drawing2D.PenAlignment.Inset })
-                e.Graphics.DrawRectangle(pen, r);
+            using (var brush = new SolidBrush(Theme.Primary))
+            {
+                e.Graphics.FillRectangle(brush, v.X - b, v.Y - b, v.Width + 2 * b, b);   // 위
+                e.Graphics.FillRectangle(brush, v.X - b, v.Bottom, v.Width + 2 * b, b);  // 아래
+                e.Graphics.FillRectangle(brush, v.X - b, v.Y, b, v.Height);              // 왼쪽
+                e.Graphics.FillRectangle(brush, v.Right, v.Y, b, v.Height);              // 오른쪽
+            }
         }
 
         /// <summary>두 칸 사이 경계선. 끌어서 폭 조절, 두 번 클릭하면 반반.</summary>
