@@ -8,8 +8,14 @@
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-11-01
+
+### Security
+- **약한 SSH 알고리즘 차단**: 1024비트 DH 키 교환(`diffie-hellman-group1-sha1`)과 64비트 블록 암호 `3des-cbc` 를 협상 목록에서 뺐다.
+  이것만 지원하는 아주 오래된 서버에는 접속할 수 없다. (group-exchange 는 최소 2048비트를 요구)
+
 ### Added
-- 단위 테스트(xUnit, `tests/Lish.Tests`, 129개): VT 파서 · OSC 7 · 문자 폭 · known_hosts · 주소 파싱 · 세션 폴더 · 세션 저장소(예전 비밀번호 삭제 마이그레이션) · 설정.
+- 단위 테스트(xUnit, `tests/Lish.Tests`, 139개): VT 파서 · SSH 알고리즘 목록 · OSC 7 · 문자 폭 · known_hosts · 주소 파싱 · 세션 폴더 · 세션 저장소(예전 비밀번호 삭제 마이그레이션) · 설정.
   PR 빌드 검사에서 함께 실행된다.
 - `CONTRIBUTING.md`: 기여 절차, 커밋 규칙, 코드 요구 사항, 테스트 정책.
 
@@ -95,7 +101,8 @@ Windows 10/11용 WinForms GUI 클라이언트 첫 공개 버전입니다.
 - SSH.NET 2026.0.0 사용 (2025.0.0 의 GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284 회피).
 - 호스트 키 확인 창의 Enter 기본값은 '취소' — 키 신뢰는 버튼을 직접 눌러야 합니다.
 
-[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.6...HEAD
+[Unreleased]: https://github.com/struggler-labs/lish/compare/v0.0.7...HEAD
+[0.0.7]: https://github.com/struggler-labs/lish/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/struggler-labs/lish/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/struggler-labs/lish/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/struggler-labs/lish/compare/v0.0.3...v0.0.4
