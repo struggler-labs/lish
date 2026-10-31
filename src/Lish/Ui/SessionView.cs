@@ -14,7 +14,6 @@ namespace Lish.Ui
     /// <summary>탭 하나: 터미널 + SSH 세션 수명 관리. SFTP 패널은 사이드바 SFTP 탭이 이 탭용으로 하나 만들어 보관한다.</summary>
     internal sealed class SessionView : UserControl
     {
-        private readonly ProfileStore _store;
         private readonly object _sendLock = new object();
 
         private SshSession _session;
@@ -44,10 +43,9 @@ namespace Lish.Ui
 
         public event EventHandler StateChanged;
 
-        public SessionView(HostProfile profile, ProfileStore store, AppSettings settings)
+        public SessionView(HostProfile profile, AppSettings settings)
         {
             Profile = profile;
-            _store = store;
             BackColor = Theme.TerminalBg;
 
             Term = new TerminalControl(settings) { Dock = DockStyle.Fill };
@@ -86,11 +84,10 @@ namespace Lish.Ui
             Exception error = null;
             try
             {
-                var session = SshSession.Open(profile, _store, ui);
+                var session = SshSession.Open(profile, ui);
                 // 비밀번호 입력 등으로 사용자 이름이 정해졌으면 반영
                 Profile.User = profile.User;
                 _session = session;
-                session.StartForwards();
                 var shell = session.Client.CreateShellStream(profile.TermOrDefault, (uint)Term.Columns, (uint)Term.RowsCount, 0, 0, 64 * 1024);
                 _shell = shell;
                 SetState(SessionState.Connected);
@@ -120,7 +117,6 @@ namespace Lish.Ui
                 case Renci.SshNet.Common.SshAuthenticationException _: return "인증 실패: " + ex.Message;
                 case Renci.SshNet.Common.SshOperationTimeoutException _: return "연결 시간 초과: " + ex.Message;
                 case System.Net.Sockets.SocketException se: return $"네트워크 오류 ({se.SocketErrorCode}): {se.Message}";
-                case Renci.SshNet.Common.ProxyException _: return "프록시 오류: " + ex.Message;
                 case OperationCanceledException _: return "접속이 취소되었습니다.";
                 default: return ex.Message;
             }

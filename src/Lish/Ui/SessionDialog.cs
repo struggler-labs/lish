@@ -16,8 +16,8 @@ namespace Lish.Ui
         private readonly ExpanderHeader _advToggle;
         private TableLayoutPanel _target;   // Section/Field/Hint 가 행을 넣을 그리드
 
-        private readonly InputBox _name, _host, _port, _user, _key, _proxy, _term, _keepAlive, _forwards, _socks, _note;
-        private readonly ComboField _group, _jump, _encoding;
+        private readonly InputBox _name, _host, _port, _user, _key, _term, _keepAlive, _note;
+        private readonly ComboField _group, _encoding;
         private readonly List<string> _folders;   // _group 항목 순서대로 (0 = 최상위 null)
         private readonly Label _error;
 
@@ -44,7 +44,7 @@ namespace Lish.Ui
             _grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.Scale(128)));
             _grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-            // 고급 설정(터미널·포트 포워딩·메모)은 접어 두고 펼치기 버튼으로 연다
+            // 고급 설정(터미널·메모)은 접어 두고 펼치기 버튼으로 연다
             _advGrid = new TableLayoutPanel
             {
                 ColumnCount = 2,
@@ -57,7 +57,7 @@ namespace Lish.Ui
             };
             _advGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.Scale(128)));
             _advGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            _advToggle = new ExpanderHeader("고급 설정", "네트워크 · 터미널 · 포트 포워딩 · 메모") { Dock = DockStyle.Top };
+            _advToggle = new ExpanderHeader("고급 설정", "터미널 · 메모") { Dock = DockStyle.Top };
             _advToggle.Toggled += (s, e) => SetAdvanced(_advToggle.Expanded);
 
             // Dock=Top 은 나중에 넣은 것이 위로 간다
@@ -92,24 +92,13 @@ namespace Lish.Ui
             keyRow.Controls.Add(browse);
             Field("개인키", keyRow);
 
+            // 점프 호스트·프록시·포트 포워딩은 보안 정책상 지원하지 않는다
             _target = _advGrid;
-            Section("네트워크");
-            _jump = Field("점프 호스트", new ComboField(true));
-            _jump.Combo.Items.Add("");
-            _jump.Combo.Items.AddRange(store.All.Where(x => existing == null || x.Name != existing.Name).Select(x => (object)x.Name).ToArray());
-            Hint("배스천 서버를 경유합니다. 저장된 세션 이름 또는 user@host:port");
-            _proxy = Field("프록시", new InputBox("http://proxy:8080 · socks5://host:1080"));
-
             Section("터미널");
             _encoding = Field("문자셋", new ComboField(true));
             _encoding.Combo.Items.AddRange(new object[] { "UTF-8", "CP949", "EUC-KR" });
             _term = Field("터미널 타입", new InputBox("xterm-256color"));
             _keepAlive = Field("Keepalive (초)", new InputBox("30 · 0 = 끔"));
-
-            Section("포트 포워딩");
-            _forwards = Field("로컬 (-L)", new InputBox("8080:10.0.0.5:80  (한 줄에 하나)") { Height = Theme.Scale(64) });
-            _forwards.Multiline = true;
-            _socks = Field("SOCKS (-D)", new InputBox("1080  (콤마로 여러 개)"));
 
             Section("메모");
             _note = Field("설명", new InputBox("선택"));
@@ -120,20 +109,15 @@ namespace Lish.Ui
             _port.Text = p.Port.ToString();
             _user.Text = p.User ?? "";
             _key.Text = p.KeyFile ?? "";
-            _jump.Text = p.Jump ?? "";
-            _proxy.Text = p.Proxy ?? "";
             _encoding.Text = string.IsNullOrEmpty(p.Encoding) ? "UTF-8" : p.Encoding.ToUpperInvariant();
             _term.Text = p.Term ?? "";
             _keepAlive.Text = p.KeepAlive.ToString();
-            _forwards.Text = string.Join("\r\n", p.LocalForwardList);
-            _socks.Text = string.Join(", ", p.DynamicForwardList);
             _note.Text = p.Note ?? "";
 
             // 기본값이 아닌 고급 설정이 있으면 처음부터 펼쳐서 보여 준다
             _advToggle.Expanded = _advGrid.Visible =
-                !string.IsNullOrEmpty(p.Jump) || !string.IsNullOrEmpty(p.Proxy)
-                || !string.IsNullOrEmpty(p.Encoding) || !string.IsNullOrEmpty(p.Term) || p.KeepAlive != 30
-                || p.LocalForwardList.Count > 0 || p.DynamicForwardList.Count > 0 || !string.IsNullOrEmpty(p.Note);
+                !string.IsNullOrEmpty(p.Encoding) || !string.IsNullOrEmpty(p.Term) || p.KeepAlive != 30
+                || !string.IsNullOrEmpty(p.Note);
 
             _error = new Label { Dock = DockStyle.Fill, ForeColor = Theme.Danger, TextAlign = ContentAlignment.MiddleLeft, AutoSize = false, Width = Theme.Scale(220), Height = Theme.Scale(32) };
 
@@ -296,8 +280,6 @@ namespace Lish.Ui
             }
             p.User = parsed.User ?? (string.IsNullOrWhiteSpace(_user.Text) ? null : _user.Text.Trim());
             p.KeyFile = Empty(_key.Text);
-            p.Jump = Empty(_jump.Text);
-            p.Proxy = Empty(_proxy.Text);
             p.Term = Empty(_term.Text);
             p.Note = Empty(_note.Text);
 
@@ -319,23 +301,6 @@ namespace Lish.Ui
                 return;
             }
             p.KeepAlive = ka;
-
-            try
-            {
-                p.LocalForwards = _forwards.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                foreach (var f in p.LocalForwardList)
-                    SshSession.ParseLocalForward(f).Dispose();
-                p.DynamicForwards = _socks.Text.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToList();
-                foreach (var f in p.DynamicForwardList)
-                    SshSession.ParseDynamicForward(f).Dispose();
-            }
-            catch (FormatException ex)
-            {
-                Fail(ex.Message, _forwards.Box);
-                return;
-            }
-            if (p.LocalForwardList.Count == 0) p.LocalForwards = null;
-            if (p.DynamicForwardList.Count == 0) p.DynamicForwards = null;
 
             if (_original != null && !string.Equals(_original.Name, p.Name, StringComparison.OrdinalIgnoreCase))
                 _store.Remove(_original.Name);

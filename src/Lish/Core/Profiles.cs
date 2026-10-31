@@ -18,12 +18,8 @@ namespace Lish.Core
         [DataMember(Order = 3)] public int Port { get; set; } = 22;
         [DataMember(Order = 4)] public string User { get; set; }
         [DataMember(Order = 5, EmitDefaultValue = false)] public string KeyFile { get; set; }
-        /// <summary>점프 호스트(배스천). 저장된 세션 이름 또는 [user@]host[:port]</summary>
-        [DataMember(Order = 6, EmitDefaultValue = false)] public string Jump { get; set; }
-        /// <summary>HTTP/SOCKS 프록시. 예: http://proxy:8080, socks5://user:pw@proxy:1080</summary>
-        [DataMember(Order = 7, EmitDefaultValue = false)] public string Proxy { get; set; }
-        [DataMember(Order = 8, EmitDefaultValue = false)] public List<string> LocalForwards { get; set; }
-        [DataMember(Order = 9, EmitDefaultValue = false)] public List<string> DynamicForwards { get; set; }
+        // Order 6~9 (점프 호스트·프록시·로컬/SOCKS 포워딩)는 보안 정책상 기능을 없앴다.
+        // 예전 hosts.json 의 값은 읽을 때 무시되고 다음 저장 때 빠진다.
         [DataMember(Order = 10, EmitDefaultValue = false)] public string Encoding { get; set; }
         [DataMember(Order = 11, EmitDefaultValue = false)] public string Term { get; set; }
         [DataMember(Order = 12)] public int KeepAlive { get; set; } = 30;
@@ -35,8 +31,6 @@ namespace Lish.Core
         [DataMember(Name = "SavedPassword", Order = 14, EmitDefaultValue = false)] private string LegacySavedPassword { get; set; }
         [DataMember(Order = 15, EmitDefaultValue = false)] public string Note { get; set; }
 
-        public List<string> LocalForwardList => LocalForwards ?? (LocalForwards = new List<string>());
-        public List<string> DynamicForwardList => DynamicForwards ?? (DynamicForwards = new List<string>());
         public string TermOrDefault => string.IsNullOrEmpty(Term) ? "xterm-256color" : Term;
         public string Title => string.IsNullOrEmpty(Name) ? Target : Name;
         public string Target => (string.IsNullOrEmpty(User) ? "" : User + "@") + Host + (Port == 22 ? "" : ":" + Port);
@@ -55,19 +49,11 @@ namespace Lish.Core
             return System.Text.Encoding.GetEncoding(n);
         }
 
-        public string Display()
-        {
-            var target = Target;
-            if (!string.IsNullOrEmpty(Jump))
-                target += "  (via " + Jump + ")";
-            return target;
-        }
+        public string Display() => Target;
 
         public HostProfile Clone()
         {
             var c = (HostProfile)MemberwiseClone();
-            c.LocalForwards = LocalForwards == null ? null : new List<string>(LocalForwards);
-            c.DynamicForwards = DynamicForwards == null ? null : new List<string>(DynamicForwards);
             c.LegacySavedPassword = null;
             return c;
         }

@@ -204,7 +204,7 @@ namespace Lish.Ui
             var mid = bounds.Y + bounds.Height / 2;
             TextRenderer.DrawText(g, p.Name, selected ? Theme.UiBold : Theme.UiFont, new Rectangle(tx, mid - Theme.Scale(17), tw, Theme.Scale(18)),
                 Theme.Ink, TextFormatFlags.Bottom | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
-            var sub = p.Target + (string.IsNullOrEmpty(p.Jump) ? "" : "  ↪ " + p.Jump);
+            var sub = p.Target;
             TextRenderer.DrawText(g, sub, Theme.Small, new Rectangle(tx, mid + Theme.Scale(1), tw, Theme.Scale(16)),
                 Theme.SubText, TextFormatFlags.Top | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
         }

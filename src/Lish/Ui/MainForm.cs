@@ -530,7 +530,7 @@ namespace Lish.Ui
 
         private void Open(HostProfile profile)
         {
-            var view = new SessionView(profile, _store, _settings) { Visible = false };
+            var view = new SessionView(profile, _settings) { Visible = false };
             view.Bounds = _content.ClientRectangle;
             // 분할 중 다른 칸을 클릭하면 그 칸이 활성
             view.Enter += (s, e) => { if (ShowingSplit && view != _tabs.Selected && (view == _left || view == _right)) _tabs.Select(view); };
