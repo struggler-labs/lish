@@ -1,0 +1,37 @@
+# CodeQL 정적 분석: C# 소스 코드 자체의 보안 취약점(경로 조작, 명령 삽입, 안전하지 않은 역직렬화, 약한 암호화 등)을 찾는다.
+# build-mode: none — 빌드 없이 소스만 분석하므로 Windows 빌드 환경이 필요 없다.
+# 결과는 Security 탭(code scanning)에 올라간다.
+name: CodeQL
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '53 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: csharp
+          build-mode: none
+          queries: security-extended
+
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:csharp
