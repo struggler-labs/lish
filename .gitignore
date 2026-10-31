@@ -3,6 +3,8 @@ bin/
 obj/
 dist/
 *.zip
+# dotnet test 결과 (trx 등)
+TestResults/
 
 # IDE / 사용자별 파일
 .vs/

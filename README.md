@@ -145,6 +145,7 @@ D2Coding 글꼴(OFL-1.1)의 고지는 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTI
 - 빌드된 실행 파일은 [Releases](https://github.com/struggler-labs/lish/releases)에서 받습니다 (`lish.exe` 단독 또는 `lish-vX.Y.Z-win.zip`, `SHA256SUMS.txt`).
 - 변경 내역: [CHANGELOG.md](CHANGELOG.md)
 - 보안 취약점 제보 · 릴리스 검증 방법: [SECURITY.md](SECURITY.md)
+- 기여 방법: [CONTRIBUTING.md](CONTRIBUTING.md)
 - 릴리스 절차: PR 에서 `src/Lish/Lish.csproj` 의 `<Version>` 을 올리고 `CHANGELOG.md` 에 같은 버전 항목을 추가 → `main` 에 병합되면
   GitHub Actions(`.github/workflows/release.yml`)가 빌드 후 `v<버전>` 태그와 릴리스를 자동으로 만듭니다. 이미 있는 버전이면 건너뜁니다.
 - PR 마다 `.github/workflows/build.yml` 이 빌드를 검사하고 exe 를 아티팩트로 남깁니다.
