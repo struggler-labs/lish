@@ -10,6 +10,8 @@
     <AssemblyName>lish</AssemblyName>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
+    <!-- packages.lock.json: 하위 의존성까지 고정하고 Trivy 취약점 검사가 읽는다 -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <Version>0.0.5</Version>
     <Product>LISH - Lightweight SSH</Product>
     <Description>Lightweight SSH &amp; SFTP Client for Windows</Description>
