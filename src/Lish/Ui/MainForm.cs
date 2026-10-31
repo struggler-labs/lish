@@ -26,6 +26,14 @@ namespace Lish.Ui
         private readonly SftpSidebar _sftpPage;
         private bool _sidebarSftp;
 
+        // 좌우 2분할: 두 칸 모두 탭 바에 있는 탭이고, 활성 칸의 탭이 _tabs.Selected 다.
+        private readonly Panel _splitBar;
+        private SessionView _left, _right;   // 분할 중일 때만 (아니면 null)
+        private double _splitRatio = 0.5;
+        private bool Split => _left != null && _right != null;
+        private SessionView _lastSelected;
+        private static int PaneBorder => Theme.Scale(2);
+
         /// <summary>SFTP 탭일 때 사이드바 최소/기본 폭 (아이콘 도구 모음 + 이름/크기 열이 들어가는 폭)</summary>
         private static int SftpMinWidth => Theme.Scale(260);
         private static int SftpDefaultWidth => Theme.Scale(320);
@@ -104,7 +112,7 @@ namespace Lish.Ui
             splitter.SplitterMoved += (s, e) => RememberSidebarWidth();
 
             // ── 탭 + 내용 ──
-            _tabs = new TabStrip { Vertical = _settings.VerticalTabs };
+            _tabs = new TabStrip { Dock = DockStyle.Top };
             _tabs.SelectedChanged += (s, e) => ShowSelected();
             _tabs.CloseRequested += CloseTab;
             _tabs.AddRequested += (s, e) => QuickConnect();
@@ -115,6 +123,10 @@ namespace Lish.Ui
             _content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.TerminalBg };
             _empty = BuildEmptyState();
             _content.Controls.Add(_empty);
+            _content.Resize += (s, e) => LayoutPanes();
+            _content.Paint += PaintPaneBorder;
+            _splitBar = BuildSplitBar();
+            _content.Controls.Add(_splitBar);
 
             var main = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Window };
             main.Controls.Add(_content);
@@ -492,16 +504,7 @@ namespace Lish.Ui
                     return;
                 foreach (var v in _tabs.Tabs)
                     v.ApplySettings(_settings);
-                _tabs.Vertical = _settings.VerticalTabs;
             }
-        }
-
-        /// <summary>탭 가로(위) ↔ 세로(왼쪽) 배치 전환. 바로 적용하고 저장.</summary>
-        private void SetVerticalTabs(bool vertical)
-        {
-            _settings.VerticalTabs = vertical;
-            _settings.Save();
-            _tabs.Vertical = vertical;
         }
 
         // ───────────── 탭 ─────────────
@@ -523,7 +526,10 @@ namespace Lish.Ui
 
         private void Open(HostProfile profile)
         {
-            var view = new SessionView(profile, _store, _settings) { Dock = DockStyle.Fill, Visible = false };
+            var view = new SessionView(profile, _store, _settings) { Visible = false };
+            view.Bounds = _content.ClientRectangle;
+            // 분할 중 다른 칸을 클릭하면 그 칸이 활성
+            view.Enter += (s, e) => { if (Split && view != _tabs.Selected && (view == _left || view == _right)) _tabs.Select(view); };
             view.StateChanged += (s, e) =>
             {
                 _tabs.Invalidate();
@@ -542,10 +548,24 @@ namespace Lish.Ui
         private void ShowSelected()
         {
             var sel = _tabs.Selected;
+            if (Split)
+            {
+                if (sel == null)
+                    _left = _right = null;
+                else if (sel != _left && sel != _right)
+                {
+                    // 탭 바에서 고른 탭은 활성 칸에 표시 (활성 칸 = 직전 선택 탭이 있던 칸)
+                    if (_lastSelected == _left) _left = sel;
+                    else _right = sel;
+                }
+            }
+            _lastSelected = sel;
+            _tabs.Companion = !Split ? null : sel == _left ? _right : _left;
             foreach (Control c in _content.Controls)
                 if (c is SessionView v)
-                    v.Visible = v == sel;
+                    v.Visible = Split ? v == _left || v == _right : v == sel;
             _empty.Visible = sel == null;
+            LayoutPanes();
             if (sel != null)
             {
                 sel.BringToFront();
@@ -563,11 +583,106 @@ namespace Lish.Ui
         private void CloseTab(SessionView view)
         {
             if (view == null) return;
+            // 분할 칸의 탭을 닫으면 남은 칸만 보인다
+            SessionView remaining = null;
+            if (Split && (view == _left || view == _right))
+            {
+                remaining = view == _left ? _right : _left;
+                _left = _right = null;
+            }
             _tabs.Remove(view);
             _content.Controls.Remove(view);
+            if (_lastSelected == view)
+                _lastSelected = null;
             view.Disconnect();
             view.Dispose();
+            if (remaining != null && _tabs.Selected != remaining)
+                _tabs.Select(remaining);
+            else
+                ShowSelected();
+        }
+
+        // ───────────── 좌우 분할 ─────────────
+
+        /// <summary>view 를 오른쪽 칸에, 지금 선택된 탭(view 자신이면 이웃 탭)을 왼쪽 칸에 놓는다.</summary>
+        private void SplitWith(SessionView view)
+        {
+            var left = _tabs.Selected != view ? _tabs.Selected : _tabs.Tabs.FirstOrDefault(t => t != view);
+            if (view == null || left == null)
+                return;
+            _left = left;
+            _right = view;
+            _lastSelected = view;
+            if (_tabs.Selected == view)
+                ShowSelected();
+            else
+                _tabs.Select(view);
+        }
+
+        private void Unsplit()
+        {
+            if (!Split) return;
+            _left = _right = null;
             ShowSelected();
+        }
+
+        /// <summary>분할이면 두 칸과 경계선, 아니면 선택 탭이 내용 영역 전체</summary>
+        private void LayoutPanes()
+        {
+            var r = _content.ClientRectangle;
+            if (!Split)
+            {
+                _splitBar.Visible = false;
+                foreach (Control c in _content.Controls)
+                    if (c is SessionView v)
+                        v.Bounds = r;
+            }
+            else
+            {
+                var bar = _splitBar.Width;
+                var min = Theme.Scale(160);
+                var lw = Math.Max(min, Math.Min(r.Width - bar - min, (int)((r.Width - bar) * _splitRatio)));
+                var b = PaneBorder;
+                _left.Bounds = Rectangle.Inflate(new Rectangle(0, 0, lw, r.Height), -b, -b);
+                _right.Bounds = Rectangle.Inflate(new Rectangle(lw + bar, 0, r.Width - lw - bar, r.Height), -b, -b);
+                _splitBar.Bounds = new Rectangle(lw, 0, bar, r.Height);
+                _splitBar.Visible = true;
+                _splitBar.BringToFront();
+            }
+            _content.Invalidate();
+        }
+
+        /// <summary>분할 중 활성 칸에 보라색 테두리</summary>
+        private void PaintPaneBorder(object sender, PaintEventArgs e)
+        {
+            var sel = _tabs.Selected;
+            if (!Split || (sel != _left && sel != _right))
+                return;
+            var b = PaneBorder;
+            var r = Rectangle.Inflate(sel.Bounds, b, b);
+            using (var pen = new Pen(Theme.Primary, b) { Alignment = System.Drawing.Drawing2D.PenAlignment.Inset })
+                e.Graphics.DrawRectangle(pen, r);
+        }
+
+        /// <summary>두 칸 사이 경계선. 끌어서 폭 조절, 두 번 클릭하면 반반.</summary>
+        private Panel BuildSplitBar()
+        {
+            var bar = new Panel { Width = Theme.Scale(6), Cursor = Cursors.VSplit, BackColor = Color.FromArgb(0x2A, 0x26, 0x44), Visible = false };
+            var dragging = false;
+            bar.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) dragging = true; };
+            bar.MouseUp += (s, e) => dragging = false;
+            bar.MouseMove += (s, e) =>
+            {
+                if (!dragging) return;
+                var x = bar.Left + e.X - bar.Width / 2;
+                var w = _content.ClientSize.Width - bar.Width;
+                if (w <= 0) return;
+                _splitRatio = Math.Max(0.15, Math.Min(0.85, x / (double)w));
+                LayoutPanes();
+                _content.Update();
+            };
+            bar.DoubleClick += (s, e) => { _splitRatio = 0.5; LayoutPanes(); };
+            return bar;
         }
 
         /// <summary>Ctrl+Shift+F: 사이드바 세션 ↔ SFTP 탭</summary>
@@ -581,19 +696,14 @@ namespace Lish.Ui
         private void ShowTabMenu(SessionView view, Point location)
         {
             var m = new FlatMenu();
-            m.Closed += (s, e) => BeginInvoke((Action)m.Dispose);
-            var layoutText = _tabs.Vertical ? "탭 가로로 보기" : "탭 세로로 보기";
-            var layoutIcon = _tabs.Vertical ? Theme.IconDockBottom : Theme.IconDockLeft;
-            if (view == null)
-            {
-                // 탭 밖 빈 곳: 배치 전환만
-                m.Add(layoutText, layoutIcon, () => SetVerticalTabs(!_tabs.Vertical));
-                m.Show(_tabs, location);
-                return;
-            }
             m.Add("다시 접속", Theme.IconRefresh, () => view.Connect()).Enabled = view.State == SessionState.Disconnected;
             m.Add("탭 복제", Theme.IconNewWindow, () => Open(view.Profile.Clone()), "Ctrl+Shift+T");
             m.Add("SFTP 열기 (사이드바)", Theme.IconFolder, () => SetSidebarPage(true), "Ctrl+Shift+F").Enabled = !_sidebarSftp;
+            m.AddSeparator();
+            if (Split && (view == _left || view == _right))
+                m.Add("분할 해제", Theme.IconUnsplit, Unsplit);
+            else
+                m.Add("오른쪽에 분할로 보기", Theme.IconSplit, () => SplitWith(view)).Enabled = _tabs.Tabs.Count >= 2;
             if (string.IsNullOrEmpty(view.Profile.Name) || _store.Find(view.Profile.Name) == null)
                 m.Add("세션으로 저장...", Theme.IconSave, () =>
                 {
@@ -610,8 +720,7 @@ namespace Lish.Ui
                 foreach (var t in _tabs.Tabs.Where(t => t != view).ToList())
                     CloseTab(t);
             });
-            m.AddSeparator();
-            m.Add(layoutText, layoutIcon, () => SetVerticalTabs(!_tabs.Vertical));
+            m.Closed += (s, e) => BeginInvoke((Action)m.Dispose);
             m.Show(_tabs, location);
         }
 
@@ -684,6 +793,10 @@ namespace Lish.Ui
                     return false;
                 case "follow": _sftpPage.FollowTerminal = arg == "on"; return true;
                 case "close": CloseTab(_tabs.Selected); return true;
+                case "split":
+                    if (arg == "off") { Unsplit(); return true; }
+                    if (int.TryParse(arg, out var si) && si >= 0 && si < _tabs.Tabs.Count) { SplitWith(_tabs.Tabs[si]); return true; }
+                    return false;
                 case "type": _tabs.Selected?.TestType(arg.Replace("\\r", "\r")); return _tabs.Selected != null;
                 case "drag": panel?.SetDropHighlight(arg == "on"); return panel != null;
                 case "drop": panel?.DropFiles(arg.Split('|')); return panel != null;

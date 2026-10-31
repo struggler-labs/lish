@@ -431,8 +431,6 @@ namespace Lish.Core
         [DataMember] public int SftpSidebarWidth { get; set; }
         /// <summary>SFTP 탭 "터미널 폴더 따라가기"</summary>
         [DataMember] public bool SftpFollowTerminal { get; set; } = true;
-        /// <summary>세션 탭을 터미널 왼쪽에 세로 목록으로 표시</summary>
-        [DataMember] public bool VerticalTabs { get; set; }
 
         [OnDeserializing]
         private void OnDeserializing(StreamingContext _)

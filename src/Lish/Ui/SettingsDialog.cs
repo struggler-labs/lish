@@ -12,13 +12,13 @@ namespace Lish.Ui
         private readonly AppSettings _settings;
         private readonly ComboField _font;
         private readonly InputBox _size, _scrollback;
-        private readonly Toggle _copyOnSelect, _rightPaste, _confirmPaste, _verticalTabs;
+        private readonly Toggle _copyOnSelect, _rightPaste, _confirmPaste;
         private readonly Panel _preview;
 
         public SettingsDialog(AppSettings settings) : base("설정", "터미널 표시와 입력 동작")
         {
             _settings = settings;
-            ClientSize = new Size(Theme.Scale(520), Theme.Scale(600));
+            ClientSize = new Size(Theme.Scale(520), Theme.Scale(560));
 
             var grid = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 2, AutoSize = true, BackColor = Color.White };
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.Scale(120)));
@@ -47,7 +47,6 @@ namespace Lish.Ui
             _copyOnSelect = Row("", new Toggle("드래그로 선택하면 자동 복사"));
             _rightPaste = Row("", new Toggle("오른쪽 클릭으로 붙여넣기 (PuTTY 방식)"));
             _confirmPaste = Row("", new Toggle("여러 줄 붙여넣기 전에 확인"));
-            _verticalTabs = Row("", new Toggle("세션 탭을 왼쪽에 세로로 보기"));
 
             _preview = new Panel { Dock = DockStyle.Top, Height = Theme.Scale(86), Margin = new Padding(0, Theme.Scale(10), 0, 0) };
             _preview.Paint += PaintPreview;
@@ -71,7 +70,6 @@ namespace Lish.Ui
             _copyOnSelect.Checked = settings.CopyOnSelect;
             _rightPaste.Checked = settings.RightClickPaste;
             _confirmPaste.Checked = settings.ConfirmMultilinePaste;
-            _verticalTabs.Checked = settings.VerticalTabs;
             _font.Combo.SelectedIndexChanged += (s, e) => _preview.Invalidate();
             _size.Box.TextChanged += (s, e) => _preview.Invalidate();
 
@@ -126,7 +124,6 @@ namespace Lish.Ui
             _settings.CopyOnSelect = _copyOnSelect.Checked;
             _settings.RightClickPaste = _rightPaste.Checked;
             _settings.ConfirmMultilinePaste = _confirmPaste.Checked;
-            _settings.VerticalTabs = _verticalTabs.Checked;
             _settings.Save();
             return true;
         }
