@@ -9,7 +9,7 @@
 ## [Unreleased]
 
 ### Fixed
-- **Shift+Enter 줄바꿈**: Shift+Enter 가 Enter 와 똑같이 `` 로 보내져 구분되지 않던 문제. 이제 Alt+Enter 처럼 `ESC CR` 을 보내 Claude Code 등 TUI 에서 줄바꿈으로 쓸 수 있다.
+- **Shift+Enter 줄바꿈**: Shift+Enter 가 Enter 와 똑같이 `\r` 로 보내져 구분되지 않던 문제. 이제 Alt+Enter 처럼 `ESC CR` 을 보내 Claude Code 등 TUI 에서 줄바꿈으로 쓸 수 있다.
 
 ### Added
 - 단위 테스트(xUnit, `tests/Lish.Tests`, 129개): VT 파서 · OSC 7 · 문자 폭 · known_hosts · 주소 파싱 · 세션 폴더 · 세션 저장소(예전 비밀번호 삭제 마이그레이션) · 설정.
