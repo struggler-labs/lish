@@ -250,7 +250,22 @@ namespace Lish.Core
             var info = new ConnectionInfo(p.Host, p.Port, user, methods);
             info.Encoding = p.GetEncoding();
             info.Timeout = TimeSpan.FromSeconds(p.Timeout > 0 ? p.Timeout : 15);
+            RemoveWeakAlgorithms(info);
             return info;
+        }
+
+        /// <summary>SSH.NET 기본 목록에 남아 있는 약한 알고리즘 (1024비트 DH, 64비트 블록 3DES).</summary>
+        internal static readonly string[] WeakKeyExchanges = { "diffie-hellman-group1-sha1" };
+        internal static readonly string[] WeakEncryptions = { "3des-cbc" };
+
+        /// <summary>
+        /// 약한 알고리즘을 협상 목록에서 뺀다. 서버가 이것만 제공하면 접속이 실패한다.
+        /// (group-exchange 는 SSH.NET 이 최소 2048비트를 요구하므로 그대로 둔다)
+        /// </summary>
+        internal static void RemoveWeakAlgorithms(ConnectionInfo info)
+        {
+            foreach (var name in WeakKeyExchanges) info.KeyExchangeAlgorithms.Remove(name);
+            foreach (var name in WeakEncryptions) info.Encryptions.Remove(name);
         }
 
         private List<IPrivateKeySource> LoadKeys(HostProfile p)
