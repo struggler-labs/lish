@@ -33,4 +33,9 @@
     <ProjectReference Include="..\..\src\Lish\Lish.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- TerminalControl 키 매핑 테스트용 (Keys 열거형) -->
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
 </Project>

@@ -792,7 +792,7 @@ namespace Lish.Terminal
             return true;
         }
 
-        private string MapKey(Keys keyData)
+        internal string MapKey(Keys keyData)
         {
             var key = keyData & Keys.KeyCode;
             var shift = (keyData & Keys.Shift) != 0;
@@ -832,7 +832,9 @@ namespace Lish.Terminal
                 case Keys.Tab: return shift ? "\x1b[Z" : "\t";
                 case Keys.Space: return ctrl ? "\0" : null;
                 case Keys.D2: return ctrl && shift ? "\0" : null;
-                case Keys.Enter: return alt ? "\x1b\r" : null;
+                // Shift+Enter 는 기본적으로 Enter 와 같은 \r 이 되어 구분이 안 된다.
+                // Alt+Enter 처럼 ESC+CR 을 보내 Claude Code 등 TUI 에서 줄바꿈으로 쓰게 한다.
+                case Keys.Enter: return alt || shift ? "\x1b\r" : null;
                 case Keys.Back:
                     if (alt) return "\x1b\x7f";
                     return ctrl ? "\b" : "\x7f";
