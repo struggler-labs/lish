@@ -27,7 +27,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SSH.NET" Version="2026.0.0" />
+    <PackageReference Include="SSH.NET" Version="2026.0.1" />
     <!-- net48 빌드용 참조 어셈블리 (Developer Pack 미설치 환경 대응) -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
